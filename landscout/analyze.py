@@ -18,7 +18,10 @@ nieruchomości pod kątem dwóch celów:
 Odpowiadasz WYŁĄCZNIE poprawnym JSON-em wg schematu, bez komentarzy. Jeśli czegoś nie da się ustalić, wpisz null.
 Ważne reguły: symbole MNE/MNe/MNR, "ekstensywna", "rezydencjonalna", "tylko wolnostojąca" => allowed_types bez blizniak/szeregowy
 i galano_segments_estimate = liczba domów wolnostojących (min. ~1000 m² na dom, chyba że plan mówi inaczej).
-Bez MPZP/WZ nie zakładaj, że można budować. Sąsiedztwo S7/S8/A2, torów, linii WN obniża bauro_fit.
+Bez MPZP/WZ nie zakładaj, że można budować.
+allowed_types: wpisz "blizniak"/"szeregowy" TYLKO gdy ogłoszenie lub plan wprost to dopuszcza (słowa: bliźniacza, szeregowa,
+segmenty, "pod deweloperkę", min. działka ≤ 600 m² na budynek). Samo "jednorodzinna" = ["wolnostojacy"].
+divisible: true tylko gdy ogłoszenie mówi o podziale lub plan podaje min. działkę wyraźnie mniejszą niż oferowana. Sąsiedztwo S7/S8/A2, torów, linii WN obniża bauro_fit.
 Nie zgaduj przeznaczenia w MPZP, jeśli tekst go nie podaje – wpisz null i oznacz w ryzykach.
 Parametry zabudowy (mpzp_params) wypełniaj TYLKO gdy ogłoszenie lub dane rejestru je podają (intensywność, % zabudowy,
 kondygnacje, wysokość, min. działka na budynek/segment, % biologicznie czynnej). W przeciwnym razie null."""

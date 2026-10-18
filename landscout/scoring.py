@@ -36,6 +36,25 @@ NO_SEGMENTS = re.compile(r"\bMNE\d*\b|\bMNe\b|\bMNR\b|ekstensywn|rezydencjonaln|
                          r"zakaz (?:zabudowy )?(?:bli[źz]niacz|szeregow)|bez mo[żz]liwo[śs]ci (?:zabudowy )?(?:bli[źz]niacz|szeregow)|min\.? ?(?:pow\.? )?dzia[łl]ki (?:1[2-9]|[2-9]\d)\d\d ?m", re.I)
 
 
+SEGMENT_EVIDENCE = re.compile(r"bli[źz]niacz|bli[źz]niak|szeregow|segment|zabudow\w* (?:bli[źz]|szereg)|pod (?:bli[źz]|szereg)|"
+                              r"deweloper|inwestycyjn|podzia[łl]\w* na (?:dzia[łl]ki|mniejsze)|mo[żz]liwo[śs][ćc] podzia[łl]u", re.I)
+SINGLE_HOUSE = re.compile(r"\bjeden dom\b|pod jeden dom|na jeden dom|wolnostoj", re.I)
+
+
+def segment_evidence(row: Listing) -> bool:
+    """Pozytywny dowód, że da się budować bliźniaki/szeregi (lub dzielić)."""
+    a = row.analysis or {}
+    allowed = a.get("allowed_types") or []
+    if "blizniak" in allowed or "szeregowy" in allowed:
+        return True
+    if a.get("divisible") is True:
+        return True
+    text = f"{row.title} {row.description}"
+    if SINGLE_HOUSE.search(text) and not SEGMENT_EVIDENCE.search(text):
+        return False
+    return bool(SEGMENT_EVIDENCE.search(text))
+
+
 def no_segments(row: Listing) -> bool:
     a = row.analysis or {}
     allowed = a.get("allowed_types") or []
@@ -157,7 +176,7 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
         score -= 10
     score = max(0.0, min(100.0, score))
 
-    if n >= need and score >= 50 and evidence and not rural:
+    if n >= need and score >= 50 and evidence and not rural and segment_evidence(row):
         verdict = "alert"
     elif (n >= max(need - 1, 1) and score >= 25) or score >= 40:
         verdict = "review"

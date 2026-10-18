@@ -16,6 +16,7 @@ LOCATIONS = [
     "mazowieckie/warszawski-zachodni",
     "mazowieckie/grojecki",
     "mazowieckie/otwocki",
+    "mazowieckie/minski",
     "mazowieckie/warszawa/warszawa/warszawa/wawer",
     "mazowieckie/warszawa/warszawa/warszawa/wilanow",
     "mazowieckie/warszawa/warszawa/warszawa/ursynow",

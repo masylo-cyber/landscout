@@ -47,6 +47,14 @@ galano:
   - {name: "Warszawa Wola", district: "Wola", ring: warszawa, center: [52.23, 20.96], radius_km: 3, olx: "warszawa"}
   - {name: "Warszawa Żoliborz", district: "Żoliborz", ring: warszawa, center: [52.27, 20.98], radius_km: 2, olx: "warszawa"}
   - {name: "Warszawa Śródmieście", district: "Śródmieście", ring: warszawa, center: [52.23, 21.01], radius_km: 2, olx: "warszawa"}
+  # powiat otwocki – bliźniaki / szeregi
+  - {name: "Otwock", commune: "Otwock", ring: pierscien, center: [52.11, 21.27], radius_km: 5, olx: "otwock"}
+  - {name: "Józefów (gmina)", commune: "Józefów", ring: pierscien, center: [52.14, 21.23], radius_km: 4, olx: "jozefow"}
+  - {name: "Karczew (gmina)", commune: "Karczew", ring: dalej, center: [52.08, 21.25], radius_km: 6, olx: "karczew"}
+  - {name: "Wiązowna (gmina)", commune: "Wiązowna", ring: dalej, center: [52.17, 21.30], radius_km: 7, olx: "wiazowna"}
+  - {name: "Celestynów (gmina)", commune: "Celestynów", ring: dalej, center: [52.06, 21.39], radius_km: 7, olx: "celestynow"}
+  - {name: "Halinów (gmina)", commune: "Halinów", ring: dalej, center: [52.23, 21.36], radius_km: 6, olx: "halinow"}
+  - {name: "Sulejówek", commune: "Sulejówek", ring: pierscien, center: [52.24, 21.28], radius_km: 4, olx: "sulejowek"}
 
 bauro:
   # BAURO = tylko wskazane obręby/miejscowości (strict). Oferta spoza listy nie trafia do profilu BAURO.
@@ -62,7 +70,7 @@ bauro:
   - {name: "Ursynów (Pyry/Dąbrówka)", ring: warszawa, center: [52.13, 21.04], radius_km: 0, district: "Ursynów",
      regions: ["Pyry", "Dąbrówka", "Jeziorki", "Grabów", "Ursynów-Las", "Kabaty"], strict: true}
   - {name: "Józefów",               ring: pierscien, center: [52.14, 21.23], radius_km: 0, commune: "Józefów",
-     regions: ["Józefów", "Michalin", "Błota", "Rycice"], strict: true, olx: "jozefow"}
+     regions: ["Józefów", "Michalin", "Błota", "Rycice", "Świdry Małe", "Dębinka", "Nowa Wieś", "Emilianów"], strict: true, olx: "jozefow"}
   - {name: "Komorów",               ring: pierscien, center: [52.14, 20.82], radius_km: 0, commune: "Michałowice",
      regions: ["Komorów", "Granica", "Nowa Wieś", "Pęcice Małe"], strict: true}
   - {name: "Podkowa Leśna",         ring: pierscien, center: [52.12, 20.72], radius_km: 0, commune: "Podkowa Leśna",

@@ -23,7 +23,7 @@ ask_secret() {
 
 say "Pakiety systemowe"
 apt-get update -qq
-apt-get install -y -qq curl git ufw fail2ban >/dev/null
+apt-get install -y -qq curl git ufw fail2ban openssl >/dev/null
 
 if ! command -v docker >/dev/null; then
   say "Instaluję Docker"
@@ -54,7 +54,7 @@ cd "$DIR"
 
 if [ ! -f .env ]; then
   say "Konfiguracja (klucze zostają tylko na tym serwerze, w $DIR/.env)"
-  DB_PASSWORD="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
+  DB_PASSWORD="$(openssl rand -hex 16)"
   ask_secret ANTHROPIC_API_KEY "Klucz API Anthropic"
   ask_secret APIFY_TOKEN "Token Apify (Enter, jeśli brak)"
   ask_secret TELEGRAM_BOT_TOKEN "Token bota Telegram (od @BotFather)"
@@ -68,7 +68,7 @@ if [ ! -f .env ]; then
     ask MAIL_TO "Adres(y) odbiorcy, po przecinku" "$SMTP_USER"
   fi
   ask PANEL_USER "Login do panelu WWW" "admin"
-  PANEL_PASSWORD="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)"
+  PANEL_PASSWORD="$(openssl rand -hex 8)"
 
   cat > .env <<EOF
 DB_PASSWORD=$DB_PASSWORD

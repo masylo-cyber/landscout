@@ -55,27 +55,29 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
             row.active = False
         db.commit()
 
-        # 2) wzbogacanie + analiza + scoring dla nowych / niewzbogaconych
+        # 2) wzbogacanie + wstępny scoring (sekwencyjnie – limity geokodera), potem analiza LLM równolegle
         q = select(Listing).where(Listing.active.is_(True), Listing.enriched_at.is_(None)).order_by(Listing.first_seen.desc()).limit(1200)
         llm_budget = 0 if no_llm else s.max_llm_per_run
+        to_analyze: list[int] = []
         for row in db.scalars(q):
             try:
                 enrich(row)
                 stats["enriched"] += 1
-                # wstępny scoring bez modelu – decyduje, czy warto wydawać tokeny
                 score(row)
                 in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text))
                 worth_llm = (row.verdict_galano != "reject" or row.verdict_bauro != "reject" or row.verdict_mw != "reject" or in_bauro) and row.kind != "dom"
-                if worth_llm and llm_budget > 0 and not row.analysis:
-                    if analyze(row):
-                        stats["analyzed"] += 1
-                        llm_budget -= 1
-                        score(row)
+                if worth_llm and not row.analysis and len(to_analyze) < llm_budget:
+                    to_analyze.append(row.id)
                 db.commit()
             except Exception as e:  # noqa: BLE001
                 db.rollback()
                 errors.append(f"enrich #{row.id}: {e}")
                 log.exception("enrich #%s", row.id)
+
+        if to_analyze:
+            n_ok = analyze_many(to_analyze, workers=4)
+            stats["analyzed"] += n_ok
+            llm_budget -= n_ok
 
         # 3) alerty (tylko raz na ofertę i profil; duplikaty klastra – raz)
         if not no_alerts:
@@ -124,10 +126,34 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
     return stats
 
 
+def analyze_many(ids: list[int], workers: int = 4) -> int:
+    """Analiza LLM równolegle; każdy wątek ma własną sesję DB. Zwraca liczbę udanych analiz."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(lid: int) -> bool:
+        with session() as db:
+            row = db.get(Listing, lid)
+            if not row or row.analysis:
+                return False
+            ok = bool(analyze(row))
+            if ok:
+                score(row)
+                db.commit()
+            return ok
+
+    ok = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for res in ex.map(one, ids):
+            ok += int(bool(res))
+    log.info("analyze_many: %d/%d", ok, len(ids))
+    return ok
+
+
 def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = False) -> dict:
     """Przelicza scoring wszystkich wzbogaconych ofert (po zmianie reguł) bez ponownego pobierania."""
     init_db()
     n = n_mpzp = n_llm = n_geo = 0
+    pending_llm: list[int] = []
     with session() as db:
         if regeocode:
             # oferty bez trafienia w obszar i z lokalizacją bez miejscowości (sama ulica) -> do ponownego wzbogacenia
@@ -149,13 +175,14 @@ def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = 
             score(row)
             in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text))
             if llm_missing > n_llm and not row.analysis and (row.verdict_galano != "reject" or row.verdict_bauro != "reject" or row.verdict_mw != "reject" or in_bauro):
-                if analyze(row):
-                    n_llm += 1
-                    score(row)
+                pending_llm.append(row.id)
+                n_llm += 1
             n += 1
             if n % 50 == 0:
                 db.commit()
         db.commit()
+    if pending_llm:
+        n_llm = analyze_many(pending_llm, workers=4)
     log.info("rescore: %d ofert, mpzp odświeżone: %d, analiz LLM: %d, do ponownego geokodowania: %d", n, n_mpzp, n_llm, n_geo)
     return {"rescored": n, "mpzp_refreshed": n_mpzp, "analyzed": n_llm, "regeocode_queued": n_geo}
 

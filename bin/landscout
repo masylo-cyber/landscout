@@ -10,6 +10,7 @@ case "${1:-help}" in
   follow)  docker compose logs -f --tail=50 "${2:-scheduler}" ;;
   diag)    docker compose run --rm scheduler landscout diag ;;
   stats)   docker compose run --rm scheduler landscout stats ;;
+  rescore) docker compose run --rm scheduler landscout rescore "${@:2}" ;;
   run)     docker compose run --rm scheduler landscout run "${@:2}" ;;
   update)
     git pull --ff-only
@@ -33,7 +34,7 @@ EOF
     ;;
   *)
     cat <<EOF
-landscout status | logs [app|scheduler|db] | follow | diag | stats | run [--source X] | update | restart | stop
+landscout status | logs [app|scheduler|db] | follow | diag | stats | rescore [--refresh-mpzp] [--llm N] | run [--source X] | update | restart | stop
 landscout telegram-setup | test-alert [galano|bauro] | shell | db | panel
 EOF
     ;;

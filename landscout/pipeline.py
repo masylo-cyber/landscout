@@ -11,7 +11,7 @@ from .analyze import analyze
 from .collectors import all_collectors
 from .config import settings
 from .db import Listing, RunLog, init_db, session
-from .enrich import enrich
+from .enrich import enrich, in_profile_area, mpzp_by_xy
 from .normalize import upsert
 from .notify import alert, discover_chat_ids, send_telegram
 from .scoring import score
@@ -64,7 +64,8 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                 stats["enriched"] += 1
                 # wstępny scoring bez modelu – decyduje, czy warto wydawać tokeny
                 score(row)
-                worth_llm = (row.verdict_galano != "reject" or row.verdict_bauro != "reject") and row.kind != "dom"
+                in_bauro = bool(row.lat and row.lon and in_profile_area(row.lat, row.lon, "bauro"))
+                worth_llm = (row.verdict_galano != "reject" or row.verdict_bauro != "reject" or in_bauro) and row.kind != "dom"
                 if worth_llm and llm_budget > 0 and not row.analysis:
                     if analyze(row):
                         stats["analyzed"] += 1
@@ -110,6 +111,31 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
     if errors and not no_alerts:
         send_telegram("⚙️ LandScout – błędy przebiegu:\n" + "\n".join(errors[:8])[:3500], "galano")
     return stats
+
+
+def rescore(refresh_mpzp: bool = False, llm_missing: int = 0) -> dict:
+    """Przelicza scoring wszystkich wzbogaconych ofert (po zmianie reguł) bez ponownego pobierania."""
+    init_db()
+    n = n_mpzp = n_llm = 0
+    with session() as db:
+        for row in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.enriched_at.isnot(None))):
+            if refresh_mpzp and row.lat and row.lon and not (row.mpzp or {}).get("has_plan"):
+                mp = mpzp_by_xy(row.lat, row.lon)
+                if mp:
+                    row.mpzp = mp
+                    n_mpzp += 1
+            score(row)
+            in_bauro = bool(row.lat and row.lon and in_profile_area(row.lat, row.lon, "bauro"))
+            if llm_missing > n_llm and not row.analysis and (row.verdict_galano != "reject" or row.verdict_bauro != "reject" or in_bauro):
+                if analyze(row):
+                    n_llm += 1
+                    score(row)
+            n += 1
+            if n % 50 == 0:
+                db.commit()
+        db.commit()
+    log.info("rescore: %d ofert, mpzp odświeżone: %d, analiz LLM: %d", n, n_mpzp, n_llm)
+    return {"rescored": n, "mpzp_refreshed": n_mpzp, "analyzed": n_llm}
 
 
 def loop() -> None:

@@ -76,6 +76,25 @@ def diag() -> None:
         except Exception as e:  # noqa: BLE001
             print("błąd:", e)
 
+        print("\n== MPZP (KIMPZP) – test Magdalenka 52.065,20.962 ==")
+        from .enrich import KIMPZP, _mpzp_requests, mpzp_by_xy, parcel_by_xy
+        try:
+            r = c.get(KIMPZP, params={"SERVICE": "WMS", "REQUEST": "GetCapabilities", "VERSION": "1.3.0"})
+            names = re.findall(r"<Name>([^<]+)</Name>", r.text)
+            print(f"GetCapabilities: status={r.status_code} len={len(r.text)} warstwy={names[:15]}")
+        except Exception as e:  # noqa: BLE001
+            print("GetCapabilities błąd:", e)
+        for i, params in enumerate(_mpzp_requests(52.065, 20.962)):
+            try:
+                r = c.get(KIMPZP, params=params)
+                txt = re.sub(r"<[^>]+>", " ", r.text)
+                txt = re.sub(r"\s+", " ", txt).strip()
+                print(f"wariant {i} ({params.get('VERSION')}, {params['LAYERS'][:20]}): status={r.status_code} len={len(r.text)} tekst={txt[:160]!r}")
+            except Exception as e:  # noqa: BLE001
+                print(f"wariant {i} błąd:", e)
+        print("mpzp_by_xy:", {k: v for k, v in mpzp_by_xy(52.065, 20.962).items() if k != "raw"})
+        print("parcel_by_xy:", {k: v for k, v in parcel_by_xy(52.065, 20.962).items() if k != "wkt"})
+
         print("\n== KOMORNIK ==")
         try:
             r = c.get("https://licytacje.komornik.pl/")

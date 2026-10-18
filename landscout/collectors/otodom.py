@@ -106,9 +106,17 @@ class OtodomCollector(Collector):
                 v = v.get("name")
             if v:
                 parts.append(str(v))
-        if not parts:
-            rg = (loc.get("reverseGeocoding") or {}).get("locations") or []
-            parts = [x.get("fullName") for x in rg if x.get("fullName")][-1:]
+        rg = (loc.get("reverseGeocoding") or {}).get("locations") or []
+        # reverseGeocoding ma hierarchię (dzielnica/miejscowość, gmina, powiat, województwo) – bierzemy najbardziej
+        # szczegółowy wpis, który nie jest ulicą, żeby geokoder zawsze dostał miejscowość
+        full = ""
+        for x in rg:
+            fn = x.get("fullName") or ""
+            if fn and not fn.lower().startswith("ul.") and len(fn) > len(full):
+                full = fn
+        if full:
+            street = next((pt for pt in parts if pt.lower().startswith("ul.") or pt == (addr.get("street") or {}).get("name") if isinstance(addr.get("street"), dict) else pt == addr.get("street")), None)
+            parts = ([street] if street else []) + [full]
         coords = loc.get("coordinates") or {}
         price = None
         tp = it.get("totalPrice")

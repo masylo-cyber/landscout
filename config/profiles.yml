@@ -30,4 +30,4 @@ bauro:
   exclude_keywords: ["rolna bez", "usługowa", "przemysł", "przy trasie", "S7", "S2", "linia kolejowa"]
   boost_keywords: ["las", "leśna", "zieleń", "cisza", "prestiż", "rezydenc", "willowa", "stary drzewostan", "MN", "mpzp"]
   # minimalny wynik (0-100) na alert
-  alert_score: 65
+  alert_score: 55

@@ -10,6 +10,32 @@ from .enrich import in_profile_area
 
 RING_DEFAULT = "dalej"
 
+# dowody, że na działce wolno budować (bez tego – najwyżej "do przeglądu")
+BUILD_EVIDENCE = re.compile(r"budowlan|\bMN\b|MN[a-z/]|warunk\w* zabudowy|\bWZ\b|pozwoleni\w* na budow|praw\w* zabudowy|inwestycyjn|pod zabudow|"
+                            r"pod bli[źz]niak|pod szereg|pod dom|deweloper|mpzp|plan\w* zagospodarowania", re.I)
+# sygnały gruntu rolnego / leśnego bez planu
+RURAL = re.compile(r"\brolna\b|\brolne\b|siedlisk|\bRM\b|\bR\d|\bZL\b|leśn|\bLs\b|łąk|pastwisk|orna", re.I)
+NUISANCE = re.compile(r"\bS7\b|\bS2\b|\bS8\b|\bA2\b|przy trasie|przy drodze krajowej|linia (?:WN|wysokiego)|tory|kolej|lotnisk|oczyszczal|składowisk", re.I)
+
+
+def build_evidence(row: Listing) -> bool:
+    a = row.analysis or {}
+    mp = row.mpzp or {}
+    syms = " ".join(mp.get("symbols") or [])
+    if re.search(r"\bMN", syms) or (a.get("zoning_symbol") or "").upper().startswith("MN"):
+        return True
+    if a.get("has_mpzp") or a.get("has_wz") or a.get("is_development_land"):
+        return True
+    return bool(BUILD_EVIDENCE.search(f"{row.title} {row.description}"))
+
+
+def is_rural(row: Listing) -> bool:
+    a = row.analysis or {}
+    if a.get("is_development_land"):
+        return False
+    text = f"{row.title} {row.description}"
+    return bool(RURAL.search(text)) and not re.search(r"budowlan|\bMN", text, re.I)
+
 
 def _kw(text: str, words: list[str]) -> int:
     t = text.lower()
@@ -58,7 +84,7 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
         return 0.0, "reject", 0
     if row.kind not in ("dzialka", "dom_rozbiorka", "unknown", "inne") and a.get("kind") not in ("dzialka", "dom_rozbiorka"):
         return 0.0, "reject", 0
-    if _excluded(text, prof["exclude_keywords"]) and not a.get("is_development_land"):
+    if _excluded(text, prof["exclude_keywords"]) and not a.get("is_development_land") and not build_evidence(row):
         return 5.0, "reject", 0
     if row.area_m2 and row.area_m2 < prof["min_area_m2"]:
         return 10.0, "reject", 0
@@ -68,9 +94,19 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
     n, _ = estimate_segments(row, prof)
     ring = row.ring or RING_DEFAULT
     need = prof["min_segments_by_ring"].get(ring, prof["min_segments_by_ring"]["dalej"])
+    evidence = build_evidence(row)
+    rural = is_rural(row)
+    if rural and not evidence:
+        n = min(n, 2)   # bez planu/WZ nie liczymy segmentów z czystej powierzchni
 
     score = 0.0
     score += min(n / max(need, 1), 2.0) * 35            # pojemność vs próg (max 70)
+    if not evidence:
+        score -= 20
+    if rural:
+        score -= 15
+    if NUISANCE.search(f"{row.title} {row.description}"):
+        score -= 10
     score += min(_kw(text, prof["boost_keywords"]), 5) * 3  # słowa kluczowe (max 15)
     mp = row.mpzp or {}
     syms = " ".join(mp.get("symbols") or [])
@@ -88,9 +124,9 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
         score -= 10
     score = max(0.0, min(100.0, score))
 
-    if n >= need and score >= 50:
+    if n >= need and score >= 50 and evidence and not rural:
         verdict = "alert"
-    elif n >= max(need - 1, 1) or score >= 40:
+    elif (n >= max(need - 1, 1) and score >= 25) or score >= 40:
         verdict = "review"
     else:
         verdict = "reject"
@@ -105,14 +141,22 @@ def score_bauro(row: Listing) -> tuple[float, str]:
         return 0.0, "reject"
     if row.kind == "dom" and a.get("kind") != "dom_rozbiorka":
         return 0.0, "reject"
-    if _excluded(text, prof["exclude_keywords"]) and not a.get("is_development_land"):
+    if _excluded(text, prof["exclude_keywords"]) and not a.get("is_development_land") and not build_evidence(row):
         return 5.0, "reject"
     if row.area_m2 and row.area_m2 < prof["min_area_m2"]:
         return 10.0, "reject"
     if row.price_pln and row.price_pln > prof["max_price_pln"]:
         return 15.0, "review"
 
+    rural = is_rural(row)
+    evidence = build_evidence(row)
     score = 30.0
+    if rural:
+        score -= 15
+    if not evidence:
+        score -= 8
+    if NUISANCE.search(text):
+        score -= 12
     lo, hi = prof["preferred_area_m2"]
     if row.area_m2:
         if lo <= row.area_m2 <= hi:
@@ -137,7 +181,7 @@ def score_bauro(row: Listing) -> tuple[float, str]:
     if a.get("road_access") == "brak":
         score -= 25
     score = max(0.0, min(100.0, score))
-    verdict = "alert" if score >= prof["alert_score"] else ("review" if score >= 45 else "reject")
+    verdict = "alert" if score >= prof["alert_score"] and not rural else ("review" if score >= 40 else "reject")
     return round(score, 1), verdict
 
 

@@ -16,6 +16,7 @@
   <div class="row" style="flex:1;min-width:260px;grid-template-columns:1fr">
     <div><b>Galano</b> <span class="badge {{ r.verdict_galano }}">{{ r.verdict_galano }}</span> wynik {{ r.score_galano|int if r.score_galano is not none else '–' }} · szac. segmentów: <b>{{ r.segments_est or '–' }}</b></div>
     <div><b>BAURO</b> <span class="badge {{ r.verdict_bauro }}">{{ r.verdict_bauro }}</span> wynik {{ r.score_bauro|int if r.score_bauro is not none else '–' }}</div>
+    <div><b>BAURO MW</b> <span class="badge {{ r.verdict_mw }}">{{ r.verdict_mw }}</span> wynik {{ r.score_mw|int if r.score_mw is not none else '–' }}</div>
   </div>
   <form class="row inline" method="post" action="/l/{{ r.id }}/status" style="flex:1;min-width:260px;grid-template-columns:1fr">
     <input type="hidden" name="back" value="/l/{{ r.id }}">
@@ -25,7 +26,7 @@
   </form>
 </div>
 
-{% for prof, pf in (('Galano', r.proforma_galano), ('BAURO', r.proforma_bauro)) %}{% if pf %}
+{% for prof, pf in (('Galano', r.proforma_galano), ('BAURO', r.proforma_bauro), ('BAURO MW', r.proforma_mw)) %}{% if pf %}
 <h3>Pro forma {{ prof }} <span class="meta">({{ {'mpzp':'parametry z MPZP','segmenty':'szacunek z liczby segmentów','domyslna':'domyślna intensywność'}[pf.method] }})</span></h3>
 <div class="meta">
 PUM <b>{{ pf.pum_m2|int }} m²</b> ({{ pf.units }} × {{ pf.unit_kind }}) · sprzedaż {{ "{:,.0f}".format(pf.sale_price_m2).replace(',',' ') }} zł/m² ({{ pf.sale_price_key }}) ·

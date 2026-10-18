@@ -31,8 +31,8 @@ def auth(c: HTTPBasicCredentials = Depends(security)) -> str:
 def index(request: Request, profile: str = "galano", verdict: str = "alert,review", status_f: str = "",
           q: str = "", page: int = 1, _: str = Depends(auth)):
     with session() as db:
-        score_col = Listing.score_galano if profile == "galano" else Listing.score_bauro
-        verdict_col = Listing.verdict_galano if profile == "galano" else Listing.verdict_bauro
+        score_col = getattr(Listing, f"score_{profile}")
+        verdict_col = getattr(Listing, f"verdict_{profile}")
         stmt = select(Listing).where(Listing.active.is_(True))
         if verdict:
             stmt = stmt.where(verdict_col.in_(verdict.split(",")))
@@ -45,7 +45,7 @@ def index(request: Request, profile: str = "galano", verdict: str = "alert,revie
         rows = db.scalars(stmt.order_by(desc(score_col), desc(Listing.first_seen)).offset((page - 1) * 50).limit(50)).all()
         last_runs = db.scalars(select(RunLog).order_by(desc(RunLog.id)).limit(5)).all()
         counts = {p: db.scalar(select(func.count()).where(Listing.active.is_(True),
-                  (Listing.verdict_galano if p == "galano" else Listing.verdict_bauro) == "alert")) for p in ("galano", "bauro")}
+                  getattr(Listing, f"verdict_{p}") == "alert")) for p in ("galano", "bauro", "mw")}
     return tpl.TemplateResponse(request, "index.html", dict(rows=rows, profile=profile, verdict=verdict,
                                 status_f=status_f, q=q, page=page, total=total, runs=last_runs, counts=counts,
                                 STATUSES=STATUSES, STATUS_PL=STATUS_PL))

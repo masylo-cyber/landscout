@@ -51,8 +51,8 @@ def _short_summary(a: dict) -> str:
 
 def card_text(row: Listing, profile: str) -> str:
     a = row.analysis or {}
-    head = "🏘 GALANO" if profile == "galano" else "🌲 BAURO"
-    sc = row.score_galano if profile == "galano" else row.score_bauro
+    head = {"galano": "🏘 GALANO", "bauro": "🌲 BAURO", "mw": "🏢 BAURO MW"}[profile]
+    sc = getattr(row, f"score_{profile}")
     price = _fmt_price(row.price_pln)
     pm2 = f" · {row.price_pln / row.area_m2:,.0f} zł/m²".replace(",", " ") if row.price_pln and row.area_m2 else ""
     where = row.area_name or row.location_text or "?"
@@ -62,6 +62,9 @@ def card_text(row: Listing, profile: str) -> str:
              f"<b>{price}</b>{pm2} · {_fmt_area(row.area_m2)}"]
     if profile == "galano":
         lines.append(f"🏗 <b>{row.segments_est or '?'} segm.</b> · MPZP: {escape(_zoning(row))}")
+    elif profile == "mw":
+        pfm = row.proforma_mw or {}
+        lines.append(f"🏢 PUM ~{pfm.get('pum_m2', '?')} m² (~{pfm.get('units', '?')} mieszkań) · MPZP: {escape(_zoning(row))}")
     else:
         lines.append(f"MPZP: {escape(_zoning(row))}")
     extras = []
@@ -77,7 +80,7 @@ def card_text(row: Listing, profile: str) -> str:
         lines.append(escape(" · ".join(extras)))
     if a.get("risks"):
         lines.append("⚠️ " + escape("; ".join(a["risks"][:3]))[:160])
-    pf = row.proforma_galano if profile == "galano" else row.proforma_bauro
+    pf = getattr(row, f"proforma_{profile}")
     if pf:
         from .proforma import proforma_line, fmt_mln
         lines.append("💰 " + proforma_line(pf))
@@ -95,6 +98,8 @@ def card_text(row: Listing, profile: str) -> str:
 
 def telegram_chat_id(profile: str) -> str:
     s = settings()
+    if profile == "mw":
+        profile = "bauro"   # wielorodzinna idzie na czat BAURO
     env = s.telegram_chat_galano if profile == "galano" else s.telegram_chat_bauro
     if env:
         return env

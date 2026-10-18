@@ -25,7 +25,7 @@ def stats() -> None:
               f"{sum(1 for r in rows if (r.mpzp or {}).get('has_plan'))} ma MPZP w rejestrze;",
               f"{sum(1 for r in rows if (r.mpzp or {}).get('symbols'))} ma symbol MPZP")
         enr = [r for r in rows if r.enriched_at]
-        for prof in ("galano", "bauro"):
+        for prof in ("galano", "bauro", "mw"):
             sc = [getattr(r, f"score_{prof}") for r in enr]
             vd = Counter(getattr(r, f"verdict_{prof}") for r in enr)
             print(f"\n== {prof.upper()} ==  werdykty: {dict(vd)}")

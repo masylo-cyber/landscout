@@ -53,6 +53,13 @@ def estimate_pum(row: Listing, profile: str) -> tuple[float, str, str]:
         return 0.0, "?", "brak"
     p = _mpzp_params(row)
     types = p["types"]
+    if profile == "mw":
+        kind = "wielorodzinna"
+        if p["far"]:
+            return round(area * float(p["far"]) * 0.75), kind, "mpzp"
+        if p["coverage"] and p["floors"]:
+            return round(area * float(p["coverage"]) / 100.0 * float(p["floors"]) * 0.75), kind, "mpzp"
+        return round(area * m["defaults"]["floor_area_ratio_mw"] * 0.75), kind, "domyslna"
     if profile == "galano":
         if "szeregowy" in types:
             kind = "szereg"
@@ -103,7 +110,12 @@ def proforma(row: Listing, profile: str) -> dict:
     land_tax = land * 0.02  # PCC – przybliżenie
     total = land + land_tax + cost_build + cost_soft + cost_sales
     margin = revenue - total
-    units = row.segments_est if profile == "galano" else max(1, round(pum / m["unit_pum_m2"]["wolnostojacy_bauro"]))
+    if profile == "galano":
+        units = row.segments_est
+    elif profile == "mw":
+        units = max(1, round(pum / 55))   # ~55 m² średnie mieszkanie
+    else:
+        units = max(1, round(pum / m["unit_pum_m2"]["wolnostojacy_bauro"]))
     return {
         "pum_m2": pum, "unit_kind": kind, "method": method, "units": units,
         "sale_price_m2": round(price_m2_gross), "sale_price_m2_net": round(price_m2), "sale_price_key": price_key,

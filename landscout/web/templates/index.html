@@ -18,8 +18,8 @@
 </form>
 
 {% for r in rows %}
-{% set sc = r.score_galano if profile=='galano' else r.score_bauro %}
-{% set vd = r.verdict_galano if profile=='galano' else r.verdict_bauro %}
+{% set sc = r['score_' ~ profile] %}
+{% set vd = r['verdict_' ~ profile] %}
 <div class="row">
   <a href="/l/{{ r.id }}">{% if r.images %}<img src="{{ r.images[0] }}" loading="lazy">{% else %}<div style="width:120px;height:90px;background:var(--line);border-radius:8px"></div>{% endif %}</a>
   <div>
@@ -35,7 +35,7 @@
       {% if profile=='galano' and r.segments_est %}<span class="badge">{{ r.segments_est }} segm.</span>{% endif %}
       {% if r.kind=='dom_rozbiorka' %}<span class="badge">dom do rozbiórki</span>{% endif %}
       {% if r.mpzp and r.mpzp.symbols %}<span class="badge">MPZP: {{ r.mpzp.symbols|join(', ') }}</span>{% elif r.analysis and r.analysis.zoning_symbol %}<span class="badge">{{ r.analysis.zoning_symbol }}</span>{% endif %}
-      {% set pf = r.proforma_galano if profile=='galano' else r.proforma_bauro %}
+      {% set pf = r['proforma_' ~ profile] %}
       {% if pf and pf.margin is not none %}<span class="badge">marża {{ (pf.margin/1e6)|round(2) }} mln ({{ pf.margin_pct }}%)</span>{% endif %}
       <span class="badge">{{ STATUS_PL[r.status] }}</span>
     </div>

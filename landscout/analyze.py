@@ -15,6 +15,8 @@ nieruchomości pod kątem dwóch celów:
 1) GALANO – zabudowa bliźniacza / szeregowa / małe domy w budżetowych lokalizacjach (liczy się liczba segmentów,
    które realnie da się postawić).
 2) BAURO – działki pod pojedyncze domy premium (Magdalenka, Konstancin, Wilanów, droższe dzielnice Warszawy).
+3) BAURO MW – działki pod zabudowę WIELORODZINNĄ w Warszawie i bliskich okolicach (MW, MW/U, U/MW, "wielorodzinna",
+   "pod kamienicę/blok"); mw_possible = true tylko przy takim przeznaczeniu w planie/WZ/ogłoszeniu.
 Odpowiadasz WYŁĄCZNIE poprawnym JSON-em wg schematu, bez komentarzy. Jeśli czegoś nie da się ustalić, wpisz null.
 Ważne reguły: symbole MNE/MNe/MNR, "ekstensywna", "rezydencjonalna", "tylko wolnostojąca" => allowed_types bez blizniak/szeregowy
 i galano_segments_estimate = liczba domów wolnostojących (min. ~1000 m² na dom, chyba że plan mówi inaczej).
@@ -49,6 +51,8 @@ SCHEMA = """{
  "galano_segments_estimate": integer|null,
  "galano_fit": 0-100,
  "bauro_fit": 0-100,
+ "mw_possible": true/false/null,
+ "mw_fit": 0-100,
  "risks": ["krótkie hasła"],
  "summary_pl": "maks. 2 krótkie zdania po polsku, konkret dla inwestora: werdykt (dla kogo i dlaczego) + jedna rzecz do sprawdzenia. Bez powtarzania ceny/powierzchni."
 }"""

@@ -239,6 +239,36 @@ def score_bauro(row: Listing) -> tuple[float, str]:
     return round(score, 1), verdict
 
 
+MW_EVIDENCE = re.compile(r"\bMW\b|MW/U|U/MW|\bMWU\b|wielorodzinn|pod (?:blok|kamienic|apartamentow)|zabudow\w* mieszkaniow\w* wielorodzinn", re.I)
+
+
+def score_mw(row: Listing) -> tuple[float, str]:
+    prof = profiles().get("mw")
+    if not prof:
+        return 0.0, "reject"
+    text = f"{row.title} {row.description}"
+    a = row.analysis or {}
+    if not (row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "mw", row.parcel, row.location_text)):
+        return 0.0, "reject"
+    if row.area_m2 and row.area_m2 < prof["min_area_m2"]:
+        return 5.0, "reject"
+    syms = " ".join((row.mpzp or {}).get("symbols") or []) + " " + (a.get("zoning_symbol") or "")
+    evidence = bool(MW_EVIDENCE.search(text) or MW_EVIDENCE.search(syms) or a.get("mw_possible"))
+    if not evidence:
+        return 10.0, "reject"
+    if _excluded(text, prof["exclude_keywords"]):
+        return 10.0, "reject"
+    score = 45.0 + min(_kw(text, prof["boost_keywords"]), 5) * 4
+    if row.area_m2:
+        score += 10 if row.area_m2 >= 3000 else 5
+    if a.get("mw_fit") is not None:
+        score = 0.6 * score + 0.4 * float(a["mw_fit"])
+    if NUISANCE.search(text):
+        score -= 5
+    score = max(0.0, min(100.0, score))
+    return round(score, 1), ("alert" if score >= prof["alert_score"] else "review")
+
+
 def score(row: Listing) -> None:
     from .proforma import proforma
     g, vg, n = score_galano(row)
@@ -247,12 +277,21 @@ def score(row: Listing) -> None:
     row.score_bauro, row.verdict_bauro = b, vb
     row.proforma_galano = proforma(row, "galano") if vg != "reject" else {}
     row.proforma_bauro = proforma(row, "bauro") if vb != "reject" else {}
+    mws, vmw = score_mw(row)
+    row.score_mw, row.verdict_mw = mws, vmw
+    row.proforma_mw = proforma(row, "mw") if vmw != "reject" else {}
+    if vmw == "alert":
+        # teren MW: nie alertujemy jako Galano/BAURO (dom jednorodzinny na MW to strata potencjału)
+        if vg == "alert":
+            row.verdict_galano = vg = "review"
+        if vb == "alert":
+            row.verdict_bauro = vb = "review"
     # profile rozłączne: obręb BAURO -> alert tylko BAURO (Galano najwyżej "review", bez alertu)
     in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text))
     if in_bauro and vb != "reject" and vg == "alert":
         row.verdict_galano = vg = "review"
     # marża koryguje wynik i werdykt
-    for prof in ("galano", "bauro"):
+    for prof in ("galano", "bauro", "mw"):
         pf = getattr(row, f"proforma_{prof}")
         if not pf or pf.get("margin_pct") is None:
             continue

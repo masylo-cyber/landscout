@@ -8,6 +8,7 @@ sale_vat: 0.08
 build_cost_pln_m2:
   galano: 5500       # bliźniaki / szeregi, stan deweloperski
   bauro: 6500        # domy premium
+  mw: 7000           # wielorodzinna (z garażem podziemnym/infrastrukturą; do korekty)
 soft_costs_pct: 0.12   # projekt, przyłącza, drogi wewn., nadzór, marketing, finansowanie – % kosztu budowy
 sales_cost_pct: 0.02   # prowizje / notariusz – % przychodu
 vat_land_note: "cena działki brutto wg ogłoszenia; dla gruntu od osoby fizycznej PCC 2%"
@@ -23,6 +24,7 @@ unit_pum_m2:
 defaults:
   floor_area_ratio_galano: 0.35   # intensywność (PUM / pow. działki) – ostrożnie
   floor_area_ratio_bauro: 0.20
+  floor_area_ratio_mw: 1.0        # intensywność brutto dla MW bez danych z planu (ostrożnie); PUM ≈ 0.75 × pow. całk.
   usable_factor: 0.85             # część działki po odjęciu dróg/odstępów
 
 # Ceny sprzedaży zł/m² PUM wg obszaru (klucz = fragment nazwy obszaru z areas.yml; dopasowanie po początku)
@@ -79,6 +81,41 @@ sale_price_pln_m2:
     "Prażmów": 8500
     "Góra Kalwaria": 8500
     "Grójec": 7500
+  mw:   # mieszkania, zł/m² brutto (do korekty wg aktualnych raportów)
+    default: 14000
+    "Warszawa Śródmieście": 24000
+    "Warszawa Żoliborz": 21000
+    "Warszawa Mokotów": 20000
+    "Warszawa Wola": 19000
+    "Warszawa Ochota": 19000
+    "Warszawa Wilanów": 19000
+    "Warszawa Ursynów": 18000
+    "Warszawa Bielany": 17000
+    "Warszawa Włochy": 17000
+    "Warszawa Praga-Południe": 17000
+    "Warszawa Praga-Północ": 16500
+    "Warszawa Bemowo": 17000
+    "Warszawa Targówek": 15500
+    "Warszawa Ursus": 15500
+    "Warszawa Białołęka": 14500
+    "Warszawa Wawer": 15000
+    "Warszawa Rembertów": 14000
+    "Warszawa Wesoła": 14000
+    "Piaseczno": 13000
+    "Lesznowola": 12500
+    "Konstancin": 15000
+    "Pruszków": 13000
+    "Piastów": 12500
+    "Raszyn": 12500
+    "Michałowice": 13000
+    "Ożarów": 12000
+    "Łomianki": 13500
+    "Marki": 12500
+    "Ząbki": 13000
+    "Legionowo": 12000
+    "Józefów": 13000
+    "Otwock": 12000
+    "Sulejówek": 12000
   bauro:
     default: 16000
     "Magdalenka": 20000

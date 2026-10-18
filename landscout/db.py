@@ -59,6 +59,10 @@ class Listing(Base):
     area_name: Mapped[str | None] = mapped_column(String(80))
     proforma_galano: Mapped[dict] = mapped_column(JSON, default=dict)
     proforma_bauro: Mapped[dict] = mapped_column(JSON, default=dict)
+    proforma_mw: Mapped[dict] = mapped_column(JSON, default=dict)
+    score_mw: Mapped[float | None] = mapped_column(Float, index=True)
+    verdict_mw: Mapped[str | None] = mapped_column(String(20))
+    alerted_mw: Mapped[bool] = mapped_column(Boolean, default=False)
     verdict_galano: Mapped[str | None] = mapped_column(String(20))  # alert | review | reject
     verdict_bauro: Mapped[str | None] = mapped_column(String(20))
     alerted_galano: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -103,9 +107,13 @@ def init_db():
     insp = inspect(engine())
     cols = {c["name"] for c in insp.get_columns("listings")}
     with engine().begin() as conn:
-        for name in ("proforma_galano", "proforma_bauro"):
+        for name in ("proforma_galano", "proforma_bauro", "proforma_mw"):
             if name not in cols:
                 conn.execute(text(f"ALTER TABLE listings ADD COLUMN {name} JSON DEFAULT '{{}}'"))
+        if "score_mw" not in cols:
+            conn.execute(text("ALTER TABLE listings ADD COLUMN score_mw FLOAT"))
+            conn.execute(text("ALTER TABLE listings ADD COLUMN verdict_mw VARCHAR(20)"))
+            conn.execute(text("ALTER TABLE listings ADD COLUMN alerted_mw BOOLEAN DEFAULT FALSE"))
 
 
 def session() -> Session:

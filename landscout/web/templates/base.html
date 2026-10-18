@@ -30,6 +30,7 @@ button{cursor:pointer}.filters{display:flex;gap:10px;flex-wrap:wrap;margin-botto
   <h1>LandScout</h1>
   <a href="/?profile=galano" class="{{ 'on' if profile=='galano' else '' }}">Galano {% if counts %}({{ counts.galano }}){% endif %}</a>
   <a href="/?profile=bauro" class="{{ 'on' if profile=='bauro' else '' }}">BAURO {% if counts %}({{ counts.bauro }}){% endif %}</a>
+  <a href="/?profile=mw" class="{{ 'on' if profile=='mw' else '' }}">BAURO MW {% if counts %}({{ counts.mw }}){% endif %}</a>
 </header>
 <main>{% block body %}{% endblock %}</main>
 </body></html>

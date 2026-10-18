@@ -209,12 +209,28 @@ def in_profile_area_parcel(lat: float, lon: float, profile: str, parcel: dict | 
     return any(_area_hits(a, lat, lon, parcel, location_text) for a in areas().get(profile, []))
 
 
+def _geocode_variants(text: str) -> list[str]:
+    parts = [p.strip() for p in (text or "").split(",") if p.strip()]
+    out = [text] if text else []
+    if parts and parts[0].lower().startswith("ul"):
+        out.append(", ".join(parts[1:]))          # bez ulicy
+    if len(parts) >= 2:
+        out.append(", ".join(parts[-3:]))          # miejscowość/gmina/powiat
+        out.append(", ".join(parts[-2:]))
+    seen, uniq = set(), []
+    for v in out:
+        if v and v not in seen:
+            seen.add(v); uniq.append(v)
+    return uniq
+
+
 def enrich(row: Listing) -> None:
     if row.lat is None or row.lon is None:
-        hint = row.location_text or row.title
-        pt = geocode(hint)
-        if pt:
-            row.lat, row.lon = pt
+        for hint in _geocode_variants(row.location_text or row.title):
+            pt = geocode(hint)
+            if pt:
+                row.lat, row.lon = pt
+                break
     if row.lat is not None and row.lon is not None:
         if not row.parcel:
             row.parcel = parcel_by_xy(row.lat, row.lon)

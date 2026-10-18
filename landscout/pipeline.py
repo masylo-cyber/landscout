@@ -131,7 +131,7 @@ def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = 
     with session() as db:
         if regeocode:
             # oferty bez trafienia w obszar i z lokalizacją bez miejscowości (sama ulica) -> do ponownego wzbogacenia
-            for row in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.area_name.is_(None))):
+            for row in db.scalars(select(Listing).where(Listing.active.is_(True), (Listing.area_name.is_(None)) | (Listing.lat.is_(None)))):
                 if "," not in (row.location_text or "") or not row.lat:
                     row.lat = row.lon = None
                     row.parcel, row.mpzp, row.parcel_id = {}, {}, None

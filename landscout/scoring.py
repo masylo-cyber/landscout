@@ -129,7 +129,9 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
     prof = profiles()["galano"]
     text = f"{row.title} {row.description}"
     a = row.analysis or {}
-    if row.lat and row.lon and not in_profile_area_parcel(row.lat, row.lon, "galano", row.parcel, row.location_text):
+    if not (row.lat and row.lon):
+        return 15.0, "review", 0          # bez geolokacji nie alertujemy
+    if not in_profile_area_parcel(row.lat, row.lon, "galano", row.parcel, row.location_text):
         return 0.0, "reject", 0
     if row.kind not in ("dzialka", "dom_rozbiorka", "unknown", "inne") and a.get("kind") not in ("dzialka", "dom_rozbiorka"):
         return 0.0, "reject", 0
@@ -192,7 +194,9 @@ def score_bauro(row: Listing) -> tuple[float, str]:
     prof = profiles()["bauro"]
     text = f"{row.title} {row.description}"
     a = row.analysis or {}
-    if row.lat and row.lon and not in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text):
+    if not (row.lat and row.lon):
+        return 0.0, "reject"              # BAURO wymaga potwierdzonej lokalizacji (obręb z ewidencji)
+    if not in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text):
         return 0.0, "reject"
     if row.kind == "dom" and a.get("kind") != "dom_rozbiorka":
         return 0.0, "reject"

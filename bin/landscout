@@ -12,6 +12,7 @@ case "${1:-help}" in
   run)     docker compose run --rm scheduler landscout run "${@:2}" ;;
   update)
     git pull --ff-only
+    install -m 755 "$DIR/bin/landscout" /usr/local/bin/landscout
     docker compose up -d --build
     echo "Zaktualizowano do $(git rev-parse --short HEAD)" ;;
   restart) docker compose restart ;;

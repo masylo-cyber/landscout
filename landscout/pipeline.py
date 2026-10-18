@@ -257,17 +257,23 @@ def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = 
 
 
 def loop() -> None:
+    """Scheduler: przebiegi co RUN_INTERVAL_MIN; bot Telegram odpowiada cały czas (osobny wątek), także w trakcie przebiegu."""
+    import threading
     s = settings()
     from .telegram_bot import poll_once
+
+    def bot():
+        while True:
+            try:
+                poll_once()
+            except Exception:  # noqa: BLE001
+                log.exception("bot poll failed")
+            time.sleep(5)
+
+    threading.Thread(target=bot, daemon=True, name="telegram-bot").start()
     while True:
         try:
             run()
         except Exception:  # noqa: BLE001
             log.exception("run failed")
-        deadline = time.time() + max(s.run_interval_min, 10) * 60
-        while time.time() < deadline:
-            try:
-                poll_once()
-            except Exception:  # noqa: BLE001
-                log.exception("bot poll failed")
-            time.sleep(20)
+        time.sleep(max(s.run_interval_min, 10) * 60)

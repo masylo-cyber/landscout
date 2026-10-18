@@ -58,7 +58,18 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
             cutoff = datetime.now(timezone.utc) - timedelta(days=14)
             for row in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.last_seen < cutoff)):
                 row.active = False
+                row.deactivated_at = row.last_seen
             db.commit()
+
+            # 1b) oferty porównawcze (domy/mieszkania) do radaru rynku
+            if not only_source:
+                try:
+                    from .comps import collect_comps
+                    stats.update(collect_comps(db))
+                except Exception as e:  # noqa: BLE001
+                    db.rollback()
+                    errors.append(f"comps: {e}")
+                    log.exception("comps")
 
             # 2) wzbogacanie + wstępny scoring (sekwencyjnie – limity geokodera), potem analiza LLM równolegle
             q = select(Listing).where(Listing.active.is_(True), Listing.enriched_at.is_(None)).order_by(Listing.first_seen.desc()).limit(1200)
@@ -83,6 +94,14 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                 n_ok = analyze_many(to_analyze, workers=4)
                 stats["analyzed"] += n_ok
                 llm_budget -= n_ok
+
+            # 2b) radar rynku 2 km dla ofert, które nie są odrzucone we wszystkich profilach (odświeżany co 7 dni)
+            try:
+                refresh_market(db)
+            except Exception as e:  # noqa: BLE001
+                db.rollback()
+                errors.append(f"market: {e}")
+                log.exception("market")
 
             # 3) alerty (tylko raz na ofertę i profil; duplikaty klastra – raz)
             if not no_alerts:
@@ -139,6 +158,28 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
     if errors and not no_alerts:
         send_telegram("⚙️ LandScout – błędy przebiegu:\n" + "\n".join(errors[:8])[:3500], "galano")
     return stats
+
+
+def refresh_market(db, max_age_days: int = 7, limit: int = 400) -> int:
+    """Liczy statystyki rynku w promieniu dla ofert z werdyktem alert/review i przelicza pro formę."""
+    from .comps import market_stats
+    q = select(Listing).where(Listing.active.is_(True), Listing.lat.isnot(None),
+                              (Listing.verdict_galano != "reject") | (Listing.verdict_bauro != "reject") | (Listing.verdict_mw != "reject"))
+    n = 0
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat()[:16]
+    for row in db.scalars(q.order_by(Listing.first_seen.desc()).limit(1500)):
+        if (row.market or {}).get("at", "") >= cutoff:
+            continue
+        row.market = market_stats(db, row.lat, row.lon)
+        score(row)
+        n += 1
+        if n % 50 == 0:
+            db.commit()
+        if n >= limit:
+            break
+    db.commit()
+    log.info("market: odświeżono %d", n)
+    return n
 
 
 def analyze_many(ids: list[int], workers: int = 4) -> int:

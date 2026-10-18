@@ -100,6 +100,16 @@ def proforma(row: Listing, profile: str) -> dict:
     if not pum or not row.price_pln:
         return {}
     price_m2_gross, price_key = sale_price(profile, row.area_name)
+    try:
+        from .comps import market_sale_price
+        mk = market_sale_price(row.market or {}, profile)
+    except Exception:  # noqa: BLE001
+        mk = None
+    if mk:
+        price_m2_gross, price_key = mk[0], f"rynek {((row.market or {}).get('radius_km') or 2):g} km, n={mk[1]}"
+    # korekta ręczna: standard / otoczenie (1–5, 3 = typowo) ±5 % na stopień
+    grade_adj = 1.0 + 0.05 * ((row.standard_grade or 3) - 3) + 0.05 * ((row.location_grade or 3) - 3)
+    price_m2_gross *= grade_adj
     price_m2 = price_m2_gross / (1 + float(m.get("sale_vat", 0.08)))   # netto
     build = m["build_cost_pln_m2"][profile]
     revenue = pum * price_m2
@@ -124,7 +134,7 @@ def proforma(row: Listing, profile: str) -> dict:
         "margin": round(margin), "margin_pct": round(margin / revenue * 100, 1) if revenue else None,
         "land_share_pct": round(land / revenue * 100, 1) if revenue else None,
         "land_per_pum": round(land / pum) if pum else None,
-        "mpzp_params": _mpzp_params(row),
+        "mpzp_params": _mpzp_params(row), "grade_adj": round(grade_adj, 2),
     }
 
 

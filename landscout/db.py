@@ -71,6 +71,11 @@ class Listing(Base):
     # praca użytkownika
     status: Mapped[str] = mapped_column(String(20), default="new", index=True)  # new|seen|called|visit|rejected|offer
     note: Mapped[str] = mapped_column(Text, default="")
+    # ocena ręczna 1–5 (3 = typowo): standard oczekiwany w tej lokalizacji / otoczenie działki
+    standard_grade: Mapped[int | None] = mapped_column(Integer)
+    location_grade: Mapped[int | None] = mapped_column(Integer)
+    market: Mapped[dict] = mapped_column(JSON, default=dict)      # radar rynku 2 km (comps.market_stats)
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class RunLog(Base):
@@ -80,6 +85,33 @@ class RunLog(Base):
     finished: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     stats: Mapped[dict] = mapped_column(JSON, default=dict)
     errors: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class Comp(Base):
+    """Oferta porównawcza (mieszkanie / dom) – rynek pierwotny i wtórny – do radaru cen w promieniu."""
+    __tablename__ = "comps"
+    __table_args__ = (UniqueConstraint("source", "external_id", name="uq_comp_source_ext"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String(40))
+    external_id: Mapped[str] = mapped_column(String(120))
+    url: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(String(20), index=True)        # dom | mieszkanie
+    market: Mapped[str] = mapped_column(String(20), index=True)      # primary | secondary
+    title: Mapped[str] = mapped_column(Text, default="")
+    development: Mapped[str | None] = mapped_column(Text)            # nazwa inwestycji (rynek pierwotny)
+    seller: Mapped[str | None] = mapped_column(Text)
+    area_m2: Mapped[float | None] = mapped_column(Float)
+    price_pln: Mapped[float | None] = mapped_column(Float)
+    price_m2: Mapped[float | None] = mapped_column(Float)
+    rooms: Mapped[int | None] = mapped_column(Integer)
+    lat: Mapped[float | None] = mapped_column(Float, index=True)
+    lon: Mapped[float | None] = mapped_column(Float, index=True)
+    location_text: Mapped[str] = mapped_column(Text, default="")
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    gone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))   # zniknęła z portalu (≈ sprzedana)
+    price_history: Mapped[list] = mapped_column(JSON, default=list)
 
 
 class KV(Base):
@@ -114,6 +146,10 @@ def init_db():
             conn.execute(text("ALTER TABLE listings ADD COLUMN score_mw FLOAT"))
             conn.execute(text("ALTER TABLE listings ADD COLUMN verdict_mw VARCHAR(20)"))
             conn.execute(text("ALTER TABLE listings ADD COLUMN alerted_mw BOOLEAN DEFAULT FALSE"))
+        for name, ddl in (("standard_grade", "INTEGER"), ("location_grade", "INTEGER"), ("market", "JSON DEFAULT '{}'"),
+                          ("deactivated_at", "TIMESTAMP WITH TIME ZONE")):
+            if name not in cols:
+                conn.execute(text(f"ALTER TABLE listings ADD COLUMN {name} {ddl}"))
 
 
 def session() -> Session:

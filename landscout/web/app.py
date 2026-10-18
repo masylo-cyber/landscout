@@ -65,13 +65,19 @@ def detail(request: Request, lid: int, _: str = Depends(auth)):
 
 
 @app.post("/l/{lid}/status")
-def set_status(lid: int, status_v: str = Form(...), note: str = Form(""), back: str = Form("/"), _: str = Depends(auth)):
+def set_status(lid: int, status_v: str = Form(...), note: str = Form(""), back: str = Form("/"),
+               standard_grade: int | None = Form(None), location_grade: int | None = Form(None), _: str = Depends(auth)):
     with session() as db:
         row = db.get(Listing, lid)
         if row and status_v in STATUSES:
             row.status = status_v
             if note:
                 row.note = note
+            if standard_grade or location_grade:
+                row.standard_grade = standard_grade or row.standard_grade
+                row.location_grade = location_grade or row.location_grade
+                from ..scoring import score
+                score(row)
             db.commit()
     return RedirectResponse(back, status_code=303)
 

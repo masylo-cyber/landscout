@@ -90,6 +90,13 @@ def card_text(row: Listing, profile: str) -> str:
     summ = _short_summary(a)
     if summ:
         lines.append(escape(summ))
+    try:
+        from .comps import market_line
+        ml = market_line(row.market or {})
+        if ml:
+            lines.append(escape(ml)[:600])
+    except Exception:  # noqa: BLE001
+        pass
     lines.append(f'<a href="{escape(row.url)}">▶ oferta ({row.source})</a>'
                  + (f' · <a href="https://maps.google.com/?q={row.lat},{row.lon}">mapa</a>' if row.lat and row.lon else "")
                  + f" · #{row.id}")

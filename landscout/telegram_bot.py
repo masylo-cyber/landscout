@@ -76,6 +76,45 @@ def _set_status(arg: str, status: str) -> str:
         return f"#{lid} → {status}"
 
 
+def _set_grade(arg: str, col: str) -> str:
+    try:
+        lid_s, g_s = arg.split()
+        lid, g = int(lid_s.strip().lstrip("#")), int(g_s)
+        assert 1 <= g <= 5
+    except Exception:  # noqa: BLE001
+        return "Użycie: /std 123 4  (1–5, 3 = typowo)"
+    from .scoring import score
+    with session() as db:
+        row = db.get(Listing, lid)
+        if not row:
+            return f"Nie ma oferty #{lid}"
+        setattr(row, col, g)
+        score(row)
+        db.commit()
+        pf = row.proforma_galano or row.proforma_bauro or row.proforma_mw
+        from .proforma import proforma_line
+        return f"#{lid} {col.split('_')[0]} = {g}" + (f"\n💰 {proforma_line(pf)}" if pf else "")
+
+
+def _market(arg: str) -> str:
+    try:
+        lid = int(arg.strip().lstrip("#"))
+    except ValueError:
+        return "Użycie: /rynek 123"
+    from .comps import market_line, market_stats
+    with session() as db:
+        row = db.get(Listing, lid)
+        if not row or not row.lat:
+            return f"Brak oferty #{lid} lub bez lokalizacji"
+        row.market = market_stats(db, row.lat, row.lon)
+        db.commit()
+        inv = row.market.get("investments") or []
+        extra = "\n".join(f"• {i['name']} – {i['kind']}, {i['dist_km']} km, {i['active']} akt./{i['gone']} zniknęło"
+                           + (f", {i['pm2_med']:,} zł/m², {i['area_p25']}–{i['area_p75']} m²".replace(",", " ") if i.get("pm2_med") else "")
+                           for i in inv[:8])
+        return escape(market_line(row.market) or "Brak ofert porównawczych w 2 km") + ("\n" + escape(extra) if extra else "")
+
+
 def handle(text: str, chat: str) -> str | None:
     t = (text or "").strip()
     if not t.startswith("/"):
@@ -94,9 +133,14 @@ def handle(text: str, chat: str) -> str | None:
         return _set_status(arg, "rejected")
     if cmd in ("/ogledziny", "/oględziny", "/visit"):
         return _set_status(arg, "visit")
+    if cmd in ("/std", "/standard", "/lok", "/otoczenie", "/otocz"):
+        return _set_grade(arg, "standard_grade" if cmd in ("/std", "/standard") else "location_grade")
+    if cmd in ("/rynek", "/market"):
+        return _market(arg)
     if cmd in ("/pomoc", "/help"):
         return ("/status – ostatni przebieg\n/stats – liczby alertów\n/top galano|bauro|mw – 5 najlepszych\n"
-                "/ok 123 – dzwoniłem\n/nie 123 – odrzuć\n/ogledziny 123 – do oględzin")
+                "/ok 123 – dzwoniłem\n/nie 123 – odrzuć\n/ogledziny 123 – do oględzin\n"
+                "/std 123 4 – standard 1–5 (3 = typowy)\n/lok 123 2 – otoczenie 1–5\n/rynek 123 – radar rynku 2 km")
     return None
 
 

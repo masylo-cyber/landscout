@@ -21,6 +21,8 @@
   <form class="row inline" method="post" action="/l/{{ r.id }}/status" style="flex:1;min-width:260px;grid-template-columns:1fr">
     <input type="hidden" name="back" value="/l/{{ r.id }}">
     <select name="status_v">{% for s in STATUSES %}<option value="{{ s }}" {{ 'selected' if r.status==s }}>{{ STATUS_PL[s] }}</option>{% endfor %}</select>
+    <div class="meta">standard <select name="standard_grade">{% for g in [1,2,3,4,5] %}<option value="{{ g }}" {{ 'selected' if (r.standard_grade or 3)==g }}>{{ g }}</option>{% endfor %}</select>
+    &nbsp; otoczenie <select name="location_grade">{% for g in [1,2,3,4,5] %}<option value="{{ g }}" {{ 'selected' if (r.location_grade or 3)==g }}>{{ g }}</option>{% endfor %}</select> (1–5, 3 = typowo; ±5 % ceny sprzedaży na stopień)</div>
     <textarea name="note" rows="3" placeholder="notatka (telefon, ustalenia, cena po negocjacji)">{{ r.note }}</textarea>
     <button>Zapisz</button>
   </form>
@@ -37,6 +39,20 @@ budowa {{ "{:,.0f}".format(pf.build).replace(',',' ') }} · miękkie {{ "{:,.0f}
 {% if pf.mpzp_params %} · MPZP: int. {{ pf.mpzp_params.far or '–' }}, zab. {{ pf.mpzp_params.coverage or '–' }}%, kond. {{ pf.mpzp_params.floors or '–' }}, min. dz. {{ pf.mpzp_params.min_plot_unit or pf.mpzp_params.min_plot or '–' }} m²{% endif %}
 </div>
 {% endif %}{% endfor %}
+
+{% if r.market %}
+<h3>Rynek w promieniu {{ r.market.radius_km }} km <span class="meta">(Otodom; „zniknęło” = oferta znikła z portalu w ciągu {{ r.market.gone_days }} dni ≈ sprzedana/wycofana; stan {{ r.market.at }})</span></h3>
+<table class="meta" style="border-collapse:collapse">
+<tr><th style="text-align:left">segment</th><th>aktywne</th><th>zł/m² (p25–mediana–p75)</th><th>metraż (p25–p75)</th><th>zniknęło</th><th>zł/m² zniknięte</th></tr>
+{% for key,label in [('dom_primary','domy – nowe'),('dom_secondary','domy – wtórne'),('mieszkanie_primary','mieszkania – nowe'),('mieszkanie_secondary','mieszkania – wtórne')] %}{% set b = r.market[key] %}{% if b %}
+<tr><td>{{ label }}</td><td align="center">{{ b.active.n }}</td><td align="center">{% if b.active.pm2_med %}{{ b.active.pm2_p25 }}–<b>{{ b.active.pm2_med }}</b>–{{ b.active.pm2_p75 }}{% else %}–{% endif %}</td>
+<td align="center">{% if b.active.area_p25 %}{{ b.active.area_p25 }}–{{ b.active.area_p75 }} m²{% else %}–{% endif %}</td><td align="center">{{ b.gone.n }}</td><td align="center">{{ b.gone.pm2_med or '–' }}</td></tr>
+{% endif %}{% endfor %}
+</table>
+{% if r.market.plots_gone %}<div class="meta">Działki wycofane z portali ({{ r.market.gone_days }} d): {{ r.market.plots_gone.n }}, cena ofertowa {{ r.market.plots_gone.pm2_min }}–<b>{{ r.market.plots_gone.pm2_med }}</b>–{{ r.market.plots_gone.pm2_max }} zł/m²</div>{% endif %}
+{% if r.market.investments %}<div class="meta"><b>Inwestycje w toku:</b>{% for i in r.market.investments %}<br>• {{ i.name }} – {{ i.kind }}, {{ i.dist_km }} km, {{ i.active }} akt. / {{ i.gone }} zniknęło{% if i.pm2_med %}, {{ i.pm2_med }} zł/m², {{ i.area_p25 }}–{{ i.area_p75 }} m²{% endif %}{% endfor %}</div>{% endif %}
+<div class="meta">Ceny transakcyjne (RCN) – płatne per powiat; do podpięcia po decyzji.</div>
+{% endif %}
 
 {% if r.analysis %}
 <h3>Analiza</h3>

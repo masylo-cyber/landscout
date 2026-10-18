@@ -29,10 +29,24 @@ galano:
   - {name: "Ożarów Mazowiecki", commune: "Ożarów Mazowiecki",     ring: pierscien, center: [52.21, 20.80], radius_km: 5,  olx: "ozarow-mazowiecki"}
   - {name: "Leszno (gmina)", commune: "Leszno",        ring: dalej,     center: [52.25, 20.58], radius_km: 6,  olx: "leszno"}
   - {name: "Konstancin-Jeziorna", commune: "Konstancin-Jeziorna",   ring: pierscien, center: [52.08, 21.12], radius_km: 6,  olx: "konstancin-jeziorna"}
-  - {name: "Warszawa Wawer", district: "Wawer",        ring: warszawa,  center: [52.20, 21.17], radius_km: 6,  olx: "warszawa"}
-  - {name: "Warszawa Wilanów", district: "Wilanów",      ring: warszawa,  center: [52.16, 21.09], radius_km: 4,  olx: "warszawa"}
-  - {name: "Warszawa Ursynów", district: "Ursynów",      ring: warszawa,  center: [52.13, 21.04], radius_km: 4,  olx: "warszawa"}
-  - {name: "Warszawa Białołęka", district: "Białołęka",    ring: warszawa,  center: [52.32, 21.00], radius_km: 6,  olx: "warszawa"}
+  - {name: "Warszawa Wawer", district: "Wawer", ring: warszawa, center: [52.20, 21.17], radius_km: 6, olx: "warszawa"}
+  - {name: "Warszawa Wilanów", district: "Wilanów", ring: warszawa, center: [52.16, 21.09], radius_km: 5, olx: "warszawa"}
+  - {name: "Warszawa Ursynów", district: "Ursynów", ring: warszawa, center: [52.13, 21.04], radius_km: 4, olx: "warszawa"}
+  - {name: "Warszawa Białołęka", district: "Białołęka", ring: warszawa, center: [52.32, 21.00], radius_km: 6, olx: "warszawa"}
+  - {name: "Warszawa Mokotów", district: "Mokotów", ring: warszawa, center: [52.19, 21.03], radius_km: 4, olx: "warszawa"}
+  - {name: "Warszawa Bielany", district: "Bielany", ring: warszawa, center: [52.29, 20.93], radius_km: 4, olx: "warszawa"}
+  - {name: "Warszawa Wesoła", district: "Wesoła", ring: warszawa, center: [52.25, 21.23], radius_km: 4, olx: "warszawa"}
+  - {name: "Warszawa Rembertów", district: "Rembertów", ring: warszawa, center: [52.26, 21.16], radius_km: 3, olx: "warszawa"}
+  - {name: "Warszawa Targówek", district: "Targówek", ring: warszawa, center: [52.29, 21.06], radius_km: 3, olx: "warszawa"}
+  - {name: "Warszawa Bemowo", district: "Bemowo", ring: warszawa, center: [52.25, 20.91], radius_km: 4, olx: "warszawa"}
+  - {name: "Warszawa Włochy", district: "Włochy", ring: warszawa, center: [52.19, 20.93], radius_km: 3, olx: "warszawa"}
+  - {name: "Warszawa Ursus", district: "Ursus", ring: warszawa, center: [52.19, 20.88], radius_km: 2, olx: "warszawa"}
+  - {name: "Warszawa Praga-Południe", district: "Praga-Południe", ring: warszawa, center: [52.24, 21.08], radius_km: 3, olx: "warszawa"}
+  - {name: "Warszawa Praga-Północ", district: "Praga-Północ", ring: warszawa, center: [52.26, 21.04], radius_km: 2, olx: "warszawa"}
+  - {name: "Warszawa Ochota", district: "Ochota", ring: warszawa, center: [52.21, 20.97], radius_km: 2, olx: "warszawa"}
+  - {name: "Warszawa Wola", district: "Wola", ring: warszawa, center: [52.23, 20.96], radius_km: 3, olx: "warszawa"}
+  - {name: "Warszawa Żoliborz", district: "Żoliborz", ring: warszawa, center: [52.27, 20.98], radius_km: 2, olx: "warszawa"}
+  - {name: "Warszawa Śródmieście", district: "Śródmieście", ring: warszawa, center: [52.23, 21.01], radius_km: 2, olx: "warszawa"}
 
 bauro:
   # BAURO = tylko wskazane obręby/miejscowości (strict). Oferta spoza listy nie trafia do profilu BAURO.

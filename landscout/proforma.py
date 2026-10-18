@@ -92,7 +92,8 @@ def proforma(row: Listing, profile: str) -> dict:
     pum, kind, method = estimate_pum(row, profile)
     if not pum or not row.price_pln:
         return {}
-    price_m2, price_key = sale_price(profile, row.area_name)
+    price_m2_gross, price_key = sale_price(profile, row.area_name)
+    price_m2 = price_m2_gross / (1 + float(m.get("sale_vat", 0.08)))   # netto
     build = m["build_cost_pln_m2"][profile]
     revenue = pum * price_m2
     cost_build = pum * build
@@ -105,7 +106,7 @@ def proforma(row: Listing, profile: str) -> dict:
     units = row.segments_est if profile == "galano" else max(1, round(pum / m["unit_pum_m2"]["wolnostojacy_bauro"]))
     return {
         "pum_m2": pum, "unit_kind": kind, "method": method, "units": units,
-        "sale_price_m2": price_m2, "sale_price_key": price_key,
+        "sale_price_m2": round(price_m2_gross), "sale_price_m2_net": round(price_m2), "sale_price_key": price_key,
         "revenue": round(revenue), "land": round(land), "build": round(cost_build), "soft": round(cost_soft),
         "sales_cost": round(cost_sales), "total_cost": round(total),
         "margin": round(margin), "margin_pct": round(margin / revenue * 100, 1) if revenue else None,
@@ -125,5 +126,5 @@ def proforma_line(pf: dict) -> str:
     if not pf:
         return ""
     tag = {"mpzp": "wg MPZP", "segmenty": "szac.", "domyslna": "zgrubnie"}.get(pf["method"], "")
-    return (f"PUM ~{pf['pum_m2']:.0f} m² ({tag}) · sprzedaż {pf['sale_price_m2']:,.0f} zł/m² · "
+    return (f"PUM ~{pf['pum_m2']:.0f} m² ({tag}) · sprzedaż {pf['sale_price_m2']:,.0f} zł/m² brutto · "
             f"marża <b>{fmt_mln(pf['margin'])}</b> ({pf['margin_pct']}%) · grunt {pf['land_share_pct']}% przychodu").replace(",", " ")

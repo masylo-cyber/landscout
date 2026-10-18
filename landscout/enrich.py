@@ -19,7 +19,7 @@ from .db import Listing
 NOMINATIM = "https://nominatim.openstreetmap.org/search"
 GUGIK_GEOCODE = "https://services.gugik.gov.pl/uug/"
 ULDK = "https://uldk.gugik.gov.pl/"
-KIMPZP = "https://integracja.gugik.gov.pl/cgi-bin/KrajowaIntegracjaMiejscowychPlanowZagospodarowaniaPrzestrzennego"
+KIMPZP = "https://mapy.geoportal.gov.pl/wss/ext/KrajowaIntegracjaMiejscowychPlanowZagospodarowaniaPrzestrzennego"  # stary adres integracja.gugik.gov.pl -> 302
 
 # symbol przeznaczenia: opcjonalny numer + litery wielkie (MN, MNU, MN/U, 3MNe, RM, ZL, U, P, KDD...) jako osobny token
 ZONING = re.compile(r"(?<![A-Za-ząćęłńóśźż])(\d{0,3}(?:MN[a-zA-Z]{0,3}(?:/U)?|MW[a-zA-Z]{0,2}|U(?:/MN)?|RM|R|ZL|ZP|ZN|P|PU|KD[A-Z]{0,3}|WS|ZD))(?![a-ząćęłńóśźż])")
@@ -99,7 +99,7 @@ def parcel_by_xy(lat: float, lon: float) -> dict:
         return {}
 
 
-MPZP_LAYERS = ["plany,raster,wektor-str,wektor-lzb", "plany", "wektor-str,wektor-lzb"]
+MPZP_LAYERS = ["plany", "plany,raster,wektor-str,wektor-lzb,wektor-pow"]
 
 
 def _mpzp_requests(lat: float, lon: float):
@@ -120,7 +120,7 @@ def mpzp_by_xy(lat: float, lon: float) -> dict:
             for params in _mpzp_requests(lat, lon):
                 r = c.get(KIMPZP, params=params)
                 t = r.text.strip()
-                if r.status_code != 200 or "ServiceException" in t or not t:
+                if r.status_code != 200 or "ServiceException" in t or "WMS server error" in t or not t:
                     continue
                 low = t.lower()
                 if "brak wyniku" in low:

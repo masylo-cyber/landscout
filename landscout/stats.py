@@ -36,10 +36,11 @@ def stats() -> None:
                 print(f"  #{r.id:<5} {getattr(r, f'score_{prof}'):>3.0f} {getattr(r, f'verdict_{prof}'):<6} "
                       f"{(r.area_name or r.location_text or '')[:22]:<22} {r.area_m2 or 0:>7.0f}m² "
                       f"{(r.price_pln or 0)/1e6:>5.2f}M  segm={r.segments_est or '-':<3} {r.kind:<13} "
-                      f"mpzp={','.join((r.mpzp or {}).get('symbols') or [])[:12]:<12} {r.title[:50]}")
+                      f"mpzp={','.join((r.mpzp or {}).get('symbols') or [])[:8]:<8} "
+                      f"marża={((getattr(r, f'proforma_{prof}') or {}).get('margin_pct'))!s:>5}% {r.title[:42]}")
         # obszary bez trafień
         print("\nobszary wg liczby ofert:", dict(Counter(r.area_name for r in enr if r.area_name).most_common(30)))
         print("poza obszarem (przykłady):", [ (r.location_text or r.title)[:30] for r in enr if not r.area_name][:10])
         from .enrich import in_profile_area_parcel
-        n_bauro_area = sum(1 for r in enr if r.lat and r.lon and in_profile_area_parcel(r.lat, r.lon, "bauro", r.parcel))
+        n_bauro_area = sum(1 for r in enr if r.lat and r.lon and in_profile_area_parcel(r.lat, r.lon, "bauro", r.parcel, r.location_text))
         print(f"ofert w obszarze BAURO: {n_bauro_area}")

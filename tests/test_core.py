@@ -31,7 +31,7 @@ def test_match_area():
 
 def test_scoring_galano_alert():
     row = Listing(source="t", external_id="1", url="u", title="Działka 3000 m2 pod zabudowę bliźniaczą MN, media",
-                  description="MPZP MN, podział możliwy, droga asfaltowa", area_m2=3000, price_pln=2_000_000,
+                  description="MPZP MN, podział możliwy, droga asfaltowa", area_m2=3000, price_pln=1_200_000, area_name="Łazy",
                   lat=52.09, lon=20.93, ring="pierscien", kind="dzialka", mpzp={"has_plan": True, "symbols": ["MN"]},
                   analysis={}, parcel={}, images=[], raw={}, price_history=[])
     score(row)

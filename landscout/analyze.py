@@ -19,7 +19,9 @@ Odpowiadasz WYŁĄCZNIE poprawnym JSON-em wg schematu, bez komentarzy. Jeśli cz
 Ważne reguły: symbole MNE/MNe/MNR, "ekstensywna", "rezydencjonalna", "tylko wolnostojąca" => allowed_types bez blizniak/szeregowy
 i galano_segments_estimate = liczba domów wolnostojących (min. ~1000 m² na dom, chyba że plan mówi inaczej).
 Bez MPZP/WZ nie zakładaj, że można budować. Sąsiedztwo S7/S8/A2, torów, linii WN obniża bauro_fit.
-Nie zgaduj przeznaczenia w MPZP, jeśli tekst go nie podaje – wpisz null i oznacz w ryzykach."""
+Nie zgaduj przeznaczenia w MPZP, jeśli tekst go nie podaje – wpisz null i oznacz w ryzykach.
+Parametry zabudowy (mpzp_params) wypełniaj TYLKO gdy ogłoszenie lub dane rejestru je podają (intensywność, % zabudowy,
+kondygnacje, wysokość, min. działka na budynek/segment, % biologicznie czynnej). W przeciwnym razie null."""
 
 SCHEMA = """{
  "kind": "dzialka|dom_rozbiorka|dom|inne",
@@ -31,6 +33,9 @@ SCHEMA = """{
  "has_wz": true/false/null,
  "allowed_types": ["wolnostojacy","blizniak","szeregowy"]|[],
  "min_plot_per_unit_m2_from_text": number|null,
+ "mpzp_params": {"floor_area_ratio": number|null, "max_coverage_pct": number|null, "max_floors": integer|null,
+                 "max_height_m": number|null, "min_plot_per_unit_m2": number|null, "min_plot_m2": number|null, "min_bio_pct": number|null,
+                 "source": "ogloszenie|rejestr|null"},
  "utilities": {"water": true/false/null, "sewage": true/false/null, "gas": true/false/null, "power": true/false/null},
  "road_access": "publiczna asfalt|publiczna gruntowa|prywatna/służebność|brak|null",
  "divisible": true/false/null,

@@ -1,0 +1,68 @@
+# Założenia rynkowe do pro formy. WARTOŚCI STARTOWE – do korekty przez Ciebie.
+# Ceny sprzedaży: zł/m² PUM (powierzchni użytkowej mieszkalnej) netto dewelopera, stan deweloperski.
+
+build_cost_pln_m2:
+  galano: 5500       # bliźniaki / szeregi, stan deweloperski
+  bauro: 6500        # domy premium
+soft_costs_pct: 0.12   # projekt, przyłącza, drogi wewn., nadzór, marketing, finansowanie – % kosztu budowy
+sales_cost_pct: 0.02   # prowizje / notariusz – % przychodu
+vat_land_note: "cena działki brutto wg ogłoszenia; dla gruntu od osoby fizycznej PCC 2%"
+
+# Typowe metraże segmentu (m² PUM) – do szacunku PUM gdy brak intensywności w planie
+unit_pum_m2:
+  szereg: 130
+  blizniak: 150
+  wolnostojacy_galano: 170
+  wolnostojacy_bauro: 300
+
+# Domyślne parametry gdy nie da się odczytać z MPZP (oznaczane jako szacunek)
+defaults:
+  floor_area_ratio_galano: 0.35   # intensywność (PUM / pow. działki) – ostrożnie
+  floor_area_ratio_bauro: 0.20
+  usable_factor: 0.85             # część działki po odjęciu dróg/odstępów
+
+# Ceny sprzedaży zł/m² PUM wg obszaru (klucz = fragment nazwy obszaru z areas.yml; dopasowanie po początku)
+sale_price_pln_m2:
+  galano:
+    default: 9500
+    "Warszawa Wawer": 13000
+    "Warszawa Wilanów": 15000
+    "Warszawa Ursynów": 14000
+    "Warszawa Białołęka": 11500
+    "Warszawa Mokotów": 16000
+    "Warszawa Bielany": 13000
+    "Konstancin": 13000
+    "Piaseczno": 10500
+    "Lesznowola": 10500
+    "Łazy": 10500
+    "Raszyn": 10500
+    "Michałowice": 11000
+    "Pruszków": 10000
+    "Piastów": 10000
+    "Józefów": 11000
+    "Nadarzyn": 9500
+    "Rusiec": 9500
+    "Brwinów": 9500
+    "Żółwin": 9500
+    "Podkowa": 11500
+    "Komorów": 11500
+    "Ożarów": 9500
+    "Grodzisk": 9000
+    "Błonie": 8500
+    "Leszno": 8500
+    "Tarczyn": 8500
+    "Złotokłos": 9000
+    "Krakowiany": 8500
+    "Prażmów": 8500
+    "Góra Kalwaria": 8500
+    "Grójec": 7500
+  bauro:
+    default: 15000
+    "Magdalenka": 16000
+    "Konstancin": 17000
+    "Wilanów": 20000
+    "Wawer": 15000
+    "Ursynów": 17000
+    "Józefów": 14000
+    "Komorów": 15000
+    "Podkowa": 16000

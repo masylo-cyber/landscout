@@ -64,7 +64,7 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                 stats["enriched"] += 1
                 # wstępny scoring bez modelu – decyduje, czy warto wydawać tokeny
                 score(row)
-                in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel))
+                in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text))
                 worth_llm = (row.verdict_galano != "reject" or row.verdict_bauro != "reject" or in_bauro) and row.kind != "dom"
                 if worth_llm and llm_budget > 0 and not row.analysis:
                     if analyze(row):
@@ -134,9 +134,9 @@ def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = 
                     row.mpzp = mp
                     n_mpzp += 1
             if row.lat and row.lon:
-                _, row.area_name, row.ring = match_area(row.lat, row.lon, row.parcel)
+                _, row.area_name, row.ring = match_area(row.lat, row.lon, row.parcel, row.location_text)
             score(row)
-            in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel))
+            in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text))
             if llm_missing > n_llm and not row.analysis and (row.verdict_galano != "reject" or row.verdict_bauro != "reject" or in_bauro):
                 if analyze(row):
                     n_llm += 1

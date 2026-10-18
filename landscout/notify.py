@@ -77,6 +77,10 @@ def card_text(row: Listing, profile: str) -> str:
         lines.append(escape(" · ".join(extras)))
     if a.get("risks"):
         lines.append("⚠️ " + escape("; ".join(a["risks"][:3]))[:160])
+    pf = row.proforma_galano if profile == "galano" else row.proforma_bauro
+    if pf:
+        from .proforma import proforma_line
+        lines.append("💰 " + proforma_line(pf))
     summ = _short_summary(a)
     if summ:
         lines.append(escape(summ))

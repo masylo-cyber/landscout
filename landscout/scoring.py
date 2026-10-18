@@ -107,7 +107,7 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
     prof = profiles()["galano"]
     text = f"{row.title} {row.description}"
     a = row.analysis or {}
-    if row.lat and row.lon and not in_profile_area_parcel(row.lat, row.lon, "galano", row.parcel):
+    if row.lat and row.lon and not in_profile_area_parcel(row.lat, row.lon, "galano", row.parcel, row.location_text):
         return 0.0, "reject", 0
     if row.kind not in ("dzialka", "dom_rozbiorka", "unknown", "inne") and a.get("kind") not in ("dzialka", "dom_rozbiorka"):
         return 0.0, "reject", 0
@@ -170,7 +170,7 @@ def score_bauro(row: Listing) -> tuple[float, str]:
     prof = profiles()["bauro"]
     text = f"{row.title} {row.description}"
     a = row.analysis or {}
-    if row.lat and row.lon and not in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel):
+    if row.lat and row.lon and not in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text):
         return 0.0, "reject"
     if row.kind == "dom" and a.get("kind") != "dom_rozbiorka":
         return 0.0, "reject"
@@ -221,7 +221,27 @@ def score_bauro(row: Listing) -> tuple[float, str]:
 
 
 def score(row: Listing) -> None:
+    from .proforma import proforma
     g, vg, n = score_galano(row)
     b, vb = score_bauro(row)
     row.score_galano, row.verdict_galano, row.segments_est = g, vg, n
     row.score_bauro, row.verdict_bauro = b, vb
+    row.proforma_galano = proforma(row, "galano") if vg != "reject" else {}
+    row.proforma_bauro = proforma(row, "bauro") if vb != "reject" else {}
+    # marża koryguje wynik i werdykt
+    for prof in ("galano", "bauro"):
+        pf = getattr(row, f"proforma_{prof}")
+        if not pf or pf.get("margin_pct") is None:
+            continue
+        sc = getattr(row, f"score_{prof}") or 0.0
+        mp = pf["margin_pct"]
+        if mp < 10:
+            sc -= 20
+        elif mp < 18:
+            sc -= 8
+        elif mp > 30:
+            sc += 6
+        sc = max(0.0, min(100.0, sc))
+        setattr(row, f"score_{prof}", round(sc, 1))
+        if mp < 8 and getattr(row, f"verdict_{prof}") == "alert":
+            setattr(row, f"verdict_{prof}", "review")

@@ -25,6 +25,18 @@
   </form>
 </div>
 
+{% for prof, pf in (('Galano', r.proforma_galano), ('BAURO', r.proforma_bauro)) %}{% if pf %}
+<h3>Pro forma {{ prof }} <span class="meta">({{ {'mpzp':'parametry z MPZP','segmenty':'szacunek z liczby segmentów','domyslna':'domyślna intensywność'}[pf.method] }})</span></h3>
+<div class="meta">
+PUM <b>{{ pf.pum_m2|int }} m²</b> ({{ pf.units }} × {{ pf.unit_kind }}) · sprzedaż {{ "{:,.0f}".format(pf.sale_price_m2).replace(',',' ') }} zł/m² ({{ pf.sale_price_key }}) ·
+przychód <b>{{ "{:,.0f}".format(pf.revenue).replace(',',' ') }}</b> zł<br>
+grunt {{ "{:,.0f}".format(pf.land).replace(',',' ') }} ({{ pf.land_share_pct }}% przychodu, {{ "{:,.0f}".format(pf.land_per_pum).replace(',',' ') }} zł/m² PUM) ·
+budowa {{ "{:,.0f}".format(pf.build).replace(',',' ') }} · miękkie {{ "{:,.0f}".format(pf.soft).replace(',',' ') }} · sprzedażowe {{ "{:,.0f}".format(pf.sales_cost).replace(',',' ') }}<br>
+<b>marża {{ "{:,.0f}".format(pf.margin).replace(',',' ') }} zł ({{ pf.margin_pct }}%)</b>
+{% if pf.mpzp_params %} · MPZP: int. {{ pf.mpzp_params.far or '–' }}, zab. {{ pf.mpzp_params.coverage or '–' }}%, kond. {{ pf.mpzp_params.floors or '–' }}, min. dz. {{ pf.mpzp_params.min_plot_unit or pf.mpzp_params.min_plot or '–' }} m²{% endif %}
+</div>
+{% endif %}{% endfor %}
+
 {% if r.analysis %}
 <h3>Analiza</h3>
 <p>{{ r.analysis.summary_pl }}</p>

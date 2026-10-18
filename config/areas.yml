@@ -35,13 +35,21 @@ galano:
   - {name: "Warszawa Białołęka", district: "Białołęka",    ring: warszawa,  center: [52.32, 21.00], radius_km: 6,  olx: "warszawa"}
 
 bauro:
-  - {name: "Magdalenka",            ring: pierscien, center: [52.06, 20.96], radius_km: 3}
-  - {name: "Konstancin-Jeziorna", commune: "Konstancin-Jeziorna",   ring: pierscien, center: [52.08, 21.12], radius_km: 6,  olx: "konstancin-jeziorna"}
-  - {name: "Warszawa Wilanów", district: "Wilanów",      ring: warszawa,  center: [52.16, 21.09], radius_km: 5,  olx: "warszawa"}
-  - {name: "Warszawa Mokotów", district: "Mokotów",      ring: warszawa,  center: [52.19, 21.03], radius_km: 4,  olx: "warszawa"}
-  - {name: "Warszawa Ursynów", district: "Ursynów",      ring: warszawa,  center: [52.13, 21.04], radius_km: 4,  olx: "warszawa"}
-  - {name: "Warszawa Wawer", district: "Wawer",        ring: warszawa,  center: [52.20, 21.17], radius_km: 6,  olx: "warszawa"}
-  - {name: "Warszawa Bielany", district: "Bielany",      ring: warszawa,  center: [52.29, 20.93], radius_km: 4,  olx: "warszawa"}
-  - {name: "Józefów", commune: "Józefów",               ring: pierscien, center: [52.14, 21.23], radius_km: 4,  olx: "jozefow"}
-  - {name: "Komorów",               ring: pierscien, center: [52.14, 20.82], radius_km: 3}
-  - {name: "Podkowa Leśna", commune: "Podkowa Leśna",         ring: pierscien, center: [52.12, 20.72], radius_km: 3,  olx: "podkowa-lesna"}
+  # BAURO = tylko wskazane obręby/miejscowości (strict). Oferta spoza listy nie trafia do profilu BAURO.
+  # regions: nazwy obrębów ewidencyjnych wg ULDK (pole "region"); dopasowanie po początku nazwy, bez wielkości liter.
+  - {name: "Magdalenka",            ring: pierscien, center: [52.060, 20.957], radius_km: 2.0, commune: "Lesznowola",
+     regions: ["Magdalenka"], strict: true}
+  - {name: "Konstancin-Jeziorna",   ring: pierscien, center: [52.08, 21.12],  radius_km: 0, commune: "Konstancin-Jeziorna",
+     regions: ["Skolimów", "Klarysew", "Mirków", "Bielawa", "Chylice", "Jeziorna", "Kierszek"], strict: true}
+  - {name: "Wilanów (Zawady/Powsin)", ring: warszawa, center: [52.16, 21.09], radius_km: 0, district: "Wilanów",
+     regions: ["Zawady", "Powsin", "Kępa Zawadowska", "Powsinek", "Wilanów"], strict: true}
+  - {name: "Wawer (Anin/Radość/Międzylesie)", ring: warszawa, center: [52.20, 21.17], radius_km: 0, district: "Wawer",
+     regions: ["Anin", "Radość", "Międzylesie", "Marysin Wawerski", "Sadul", "Falenica", "Miedzeszyn"], strict: true}
+  - {name: "Ursynów (Pyry/Dąbrówka)", ring: warszawa, center: [52.13, 21.04], radius_km: 0, district: "Ursynów",
+     regions: ["Pyry", "Dąbrówka", "Jeziorki", "Grabów", "Ursynów-Las", "Kabaty"], strict: true}
+  - {name: "Józefów",               ring: pierscien, center: [52.14, 21.23], radius_km: 0, commune: "Józefów",
+     regions: ["Józefów", "Michalin", "Błota", "Rycice"], strict: true, olx: "jozefow"}
+  - {name: "Komorów",               ring: pierscien, center: [52.14, 20.82], radius_km: 0, commune: "Michałowice",
+     regions: ["Komorów", "Granica", "Nowa Wieś", "Pęcice Małe"], strict: true}
+  - {name: "Podkowa Leśna",         ring: pierscien, center: [52.12, 20.72], radius_km: 0, commune: "Podkowa Leśna",
+     regions: ["Podkowa Leśna", "Żółwin", "Owczarnia"], strict: true, olx: "podkowa-lesna"}

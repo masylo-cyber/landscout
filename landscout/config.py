@@ -46,6 +46,8 @@ class Area(BaseModel):
     olx: str | None = None
     commune: str | None = None   # gmina wg ULDK
     district: str | None = None  # dzielnica Warszawy (ULDK: commune "Warszawa", region zawiera dzielnicę)
+    regions: list[str] = []      # obręby ewidencyjne / miejscowości (dopasowanie po początku nazwy)
+    strict: bool = False         # True: dopasowanie TYLKO po regions (brak -> poza obszarem)
 
 
 @lru_cache

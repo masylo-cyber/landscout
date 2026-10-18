@@ -57,6 +57,8 @@ class Listing(Base):
     segments_est: Mapped[int | None] = mapped_column(Integer)
     ring: Mapped[str | None] = mapped_column(String(20))
     area_name: Mapped[str | None] = mapped_column(String(80))
+    proforma_galano: Mapped[dict] = mapped_column(JSON, default=dict)
+    proforma_bauro: Mapped[dict] = mapped_column(JSON, default=dict)
     verdict_galano: Mapped[str | None] = mapped_column(String(20))  # alert | review | reject
     verdict_bauro: Mapped[str | None] = mapped_column(String(20))
     alerted_galano: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -96,6 +98,14 @@ def engine():
 
 def init_db():
     Base.metadata.create_all(engine())
+    # proste migracje dodające kolumny (bez Alembic)
+    from sqlalchemy import inspect, text
+    insp = inspect(engine())
+    cols = {c["name"] for c in insp.get_columns("listings")}
+    with engine().begin() as conn:
+        for name in ("proforma_galano", "proforma_bauro"):
+            if name not in cols:
+                conn.execute(text(f"ALTER TABLE listings ADD COLUMN {name} JSON DEFAULT '{{}}'"))
 
 
 def session() -> Session:

@@ -10,7 +10,7 @@ from .base import Collector, RawOffer, area_from_text, client, get, log, to_floa
 # powiaty / miasta (slug morizon)
 LOCATIONS = ["piaseczynski", "pruszkowski", "grodziski", "warszawski-zachodni", "grojecki", "otwocki", "minski",
              "legionowski", "warszawa"]
-URL = "https://www.morizon.pl/dzialki/najnowsze/{loc}/?page={page}"
+URL = "https://www.morizon.pl/dzialki/najnowsze/{loc}/"
 LD_RE = re.compile(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', re.S)
 
 
@@ -44,7 +44,8 @@ class MorizonCollector(Collector):
             for loc in LOCATIONS:
                 for page in range(1, self.pages + 1):
                     try:
-                        offers = _offers(get(c, URL.format(loc=loc, page=page)).text)
+                        url = URL.format(loc=loc) + (f"?page={page}" if page > 1 else "")
+                        offers = _offers(get(c, url).text)
                     except Exception as e:  # noqa: BLE001
                         log.warning("morizon %s p%s: %s", loc, page, e)
                         break

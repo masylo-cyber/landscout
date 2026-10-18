@@ -5,7 +5,7 @@ import logging
 import time
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from .analyze import analyze
 from .collectors import all_collectors
@@ -27,98 +27,108 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
     t0 = time.time()
 
     with session() as db:
-        runlog = RunLog()
-        db.add(runlog)
-        db.commit()
+        # blokada: tylko jeden przebieg naraz (scheduler + ręczny `landscout run`)
+        if not db.execute(text("select pg_try_advisory_lock(815001)")).scalar():
+            log.warning("inny przebieg trwa – pomijam")
+            return stats | {"skipped": True}
+        try:
+            runlog = RunLog()
+            db.add(runlog)
+            db.commit()
 
-        # 1) zbieranie
-        seen_ids: set[int] = set()
-        for col in all_collectors(only_source):
-            n_src = 0
-            try:
-                for offer in col.collect():
-                    row, is_new = upsert(db, offer)
-                    seen_ids.add(row.id)
-                    n_src += 1
-                    stats["collected"] += 1
-                    stats["new"] += int(is_new)
-                db.commit()
-            except Exception as e:  # noqa: BLE001
-                db.rollback()
-                errors.append(f"{col.name}: {e}")
-                log.exception("collector %s", col.name)
-            log.info("%s: %d ofert", col.name, n_src)
+            # 1) zbieranie
+            seen_ids: set[int] = set()
+            for col in all_collectors(only_source):
+                n_src = 0
+                try:
+                    for offer in col.collect():
+                        row, is_new = upsert(db, offer)
+                        seen_ids.add(row.id)
+                        n_src += 1
+                        stats["collected"] += 1
+                        stats["new"] += int(is_new)
+                    db.commit()
+                except Exception as e:  # noqa: BLE001
+                    db.rollback()
+                    errors.append(f"{col.name}: {e}")
+                    log.exception("collector %s", col.name)
+                log.info("%s: %d ofert", col.name, n_src)
 
-        # oferty niewidziane od 14 dni -> nieaktywne
-        cutoff = datetime.now(timezone.utc) - timedelta(days=14)
-        for row in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.last_seen < cutoff)):
-            row.active = False
-        db.commit()
+            # oferty niewidziane od 14 dni -> nieaktywne
+            cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+            for row in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.last_seen < cutoff)):
+                row.active = False
+            db.commit()
 
-        # 2) wzbogacanie + wstępny scoring (sekwencyjnie – limity geokodera), potem analiza LLM równolegle
-        q = select(Listing).where(Listing.active.is_(True), Listing.enriched_at.is_(None)).order_by(Listing.first_seen.desc()).limit(1200)
-        llm_budget = 0 if no_llm else s.max_llm_per_run
-        to_analyze: list[int] = []
-        for row in db.scalars(q):
-            try:
-                enrich(row)
-                stats["enriched"] += 1
-                score(row)
-                in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text))
-                worth_llm = (row.verdict_galano != "reject" or row.verdict_bauro != "reject" or row.verdict_mw != "reject" or in_bauro) and row.kind != "dom"
-                if worth_llm and not row.analysis and len(to_analyze) < llm_budget:
-                    to_analyze.append(row.id)
-                db.commit()
-            except Exception as e:  # noqa: BLE001
-                db.rollback()
-                errors.append(f"enrich #{row.id}: {e}")
-                log.exception("enrich #%s", row.id)
+            # 2) wzbogacanie + wstępny scoring (sekwencyjnie – limity geokodera), potem analiza LLM równolegle
+            q = select(Listing).where(Listing.active.is_(True), Listing.enriched_at.is_(None)).order_by(Listing.first_seen.desc()).limit(1200)
+            llm_budget = 0 if no_llm else s.max_llm_per_run
+            to_analyze: list[int] = []
+            for row in db.scalars(q):
+                try:
+                    enrich(row)
+                    stats["enriched"] += 1
+                    score(row)
+                    in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text))
+                    worth_llm = (row.verdict_galano != "reject" or row.verdict_bauro != "reject" or row.verdict_mw != "reject" or in_bauro) and row.kind != "dom"
+                    if worth_llm and not row.analysis and len(to_analyze) < llm_budget:
+                        to_analyze.append(row.id)
+                    db.commit()
+                except Exception as e:  # noqa: BLE001
+                    db.rollback()
+                    errors.append(f"enrich #{row.id}: {e}")
+                    log.exception("enrich #%s", row.id)
 
-        if to_analyze:
-            n_ok = analyze_many(to_analyze, workers=4)
-            stats["analyzed"] += n_ok
-            llm_budget -= n_ok
+            if to_analyze:
+                n_ok = analyze_many(to_analyze, workers=4)
+                stats["analyzed"] += n_ok
+                llm_budget -= n_ok
 
-        # 3) alerty (tylko raz na ofertę i profil; duplikaty klastra – raz)
-        if not no_alerts:
-            discover_chat_ids()
-            alerted_clusters: set[str] = set()
-            for prof, flag_col, verdict_col in (("galano", "alerted_galano", "verdict_galano"),
-                                                ("bauro", "alerted_bauro", "verdict_bauro"),
-                                                ("mw", "alerted_mw", "verdict_mw")):
-                q = select(Listing).where(Listing.active.is_(True), getattr(Listing, flag_col).is_(False),
-                                          getattr(Listing, verdict_col) == "alert")
-                for row in db.scalars(q):
-                    if not row.analysis:
-                        # alert dopiero po analizie modelem (MPZP/PUM/marża); bez niej czeka w panelu
-                        if llm_budget > 0 and analyze(row):
-                            llm_budget -= 1
-                            score(row)
-                            db.commit()
-                            if getattr(row, verdict_col) != "alert":
+            # 3) alerty (tylko raz na ofertę i profil; duplikaty klastra – raz)
+            if not no_alerts:
+                discover_chat_ids()
+                alerted_clusters: set[str] = set()
+                for prof, flag_col, verdict_col in (("galano", "alerted_galano", "verdict_galano"),
+                                                    ("bauro", "alerted_bauro", "verdict_bauro"),
+                                                    ("mw", "alerted_mw", "verdict_mw")):
+                    q = select(Listing).where(Listing.active.is_(True), getattr(Listing, flag_col).is_(False),
+                                              getattr(Listing, verdict_col) == "alert")
+                    for row in db.scalars(q):
+                        if not row.analysis:
+                            # alert dopiero po analizie modelem (MPZP/PUM/marża); bez niej czeka w panelu
+                            if llm_budget > 0 and analyze(row):
+                                llm_budget -= 1
+                                score(row)
+                                db.commit()
+                                if getattr(row, verdict_col) != "alert":
+                                    continue
+                            else:
                                 continue
-                        else:
+                        ck = f"{prof}:{row.cluster_key}" if row.cluster_key else None
+                        if ck and ck in alerted_clusters:
+                            setattr(row, flag_col, True)
                             continue
-                    ck = f"{prof}:{row.cluster_key}" if row.cluster_key else None
-                    if ck and ck in alerted_clusters:
-                        setattr(row, flag_col, True)
-                        continue
-                    if ck and db.scalar(select(Listing.id).where(Listing.cluster_key == row.cluster_key,
-                                                                 getattr(Listing, flag_col).is_(True))):
-                        setattr(row, flag_col, True)   # ten sam grunt już alertowany z innego portalu
-                        continue
-                    if alert(row, prof):
-                        setattr(row, flag_col, True)
-                        stats[f"alerts_{prof}"] += 1
-                        if ck:
-                            alerted_clusters.add(ck)
-                        time.sleep(1.2)
-                db.commit()
+                        if ck and db.scalar(select(Listing.id).where(Listing.cluster_key == row.cluster_key,
+                                                                     getattr(Listing, flag_col).is_(True))):
+                            setattr(row, flag_col, True)   # ten sam grunt już alertowany z innego portalu
+                            continue
+                        if alert(row, prof):
+                            setattr(row, flag_col, True)
+                            stats[f"alerts_{prof}"] += 1
+                            if ck:
+                                alerted_clusters.add(ck)
+                            time.sleep(1.2)
+                    db.commit()
 
-        runlog.finished = datetime.now(timezone.utc)
-        runlog.stats = stats | {"seconds": round(time.time() - t0)}
-        runlog.errors = errors
-        db.commit()
+            runlog.finished = datetime.now(timezone.utc)
+            runlog.stats = stats | {"seconds": round(time.time() - t0)}
+            runlog.errors = errors
+            db.commit()
+
+        finally:
+            db.rollback()
+            db.execute(text("select pg_advisory_unlock(815001)"))
+            db.commit()
 
     log.info("run done: %s errors=%d", stats, len(errors))
     if errors and not no_alerts:

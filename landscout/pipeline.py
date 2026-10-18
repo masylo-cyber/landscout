@@ -56,7 +56,7 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
         db.commit()
 
         # 2) wzbogacanie + analiza + scoring dla nowych / niewzbogaconych
-        q = select(Listing).where(Listing.active.is_(True), Listing.enriched_at.is_(None)).order_by(Listing.first_seen.desc()).limit(400)
+        q = select(Listing).where(Listing.active.is_(True), Listing.enriched_at.is_(None)).order_by(Listing.first_seen.desc()).limit(1200)
         llm_budget = 0 if no_llm else s.max_llm_per_run
         for row in db.scalars(q):
             try:

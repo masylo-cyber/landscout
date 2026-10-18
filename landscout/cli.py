@@ -20,6 +20,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("serve", help="panel WWW")
     sub.add_parser("initdb", help="utwórz tabele")
     sub.add_parser("diag", help="diagnostyka źródeł")
+    sub.add_parser("stats", help="rozkład wyników do kalibracji")
     sub.add_parser("telegram-setup", help="wykryj chat_id po /start")
     t = sub.add_parser("test-alert", help="wyślij testowy alert")
     t.add_argument("profile", nargs="?", default="galano")
@@ -37,6 +38,9 @@ def main(argv: list[str] | None = None) -> int:
         from .db import init_db
         init_db()
         uvicorn.run("landscout.web.app:app", host="0.0.0.0", port=8080, log_level="info")
+    elif a.cmd == "stats":
+        from .stats import stats
+        stats()
     elif a.cmd == "diag":
         from .diag import diag
         diag()

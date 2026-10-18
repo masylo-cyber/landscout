@@ -94,20 +94,38 @@ def parcel_by_xy(lat: float, lon: float) -> dict:
         return {}
 
 
+MPZP_LAYERS = ["plany,raster,wektor-str,wektor-lzb", "plany", "wektor-str,wektor-lzb"]
+
+
+def _mpzp_requests(lat: float, lon: float):
+    d = 0.0005
+    for layers in MPZP_LAYERS:
+        # WMS 1.3.0 / EPSG:4326 -> oś lat,lon
+        yield {"SERVICE": "WMS", "REQUEST": "GetFeatureInfo", "VERSION": "1.3.0", "CRS": "EPSG:4326",
+               "LAYERS": layers, "QUERY_LAYERS": layers, "STYLES": "",
+               "BBOX": f"{lat - d},{lon - d},{lat + d},{lon + d}", "WIDTH": "101", "HEIGHT": "101", "I": "50", "J": "50",
+               "INFO_FORMAT": "text/html", "FEATURE_COUNT": "10"}
+        # WMS 1.1.1 / EPSG:4326 -> oś lon,lat
+        yield {"SERVICE": "WMS", "REQUEST": "GetFeatureInfo", "VERSION": "1.1.1", "SRS": "EPSG:4326",
+               "LAYERS": layers, "QUERY_LAYERS": layers, "STYLES": "",
+               "BBOX": f"{lon - d},{lat - d},{lon + d},{lat + d}", "WIDTH": "101", "HEIGHT": "101", "X": "50", "Y": "50",
+               "INFO_FORMAT": "text/html", "FEATURE_COUNT": "10"}
+
+
 def mpzp_by_xy(lat: float, lon: float) -> dict:
     """KIMPZP (GUGiK) GetFeatureInfo w punkcie – nazwa planu, status, link do uchwały, symbol przeznaczenia (jeśli jest)."""
-    d = 0.0005
-    params = {
-        "SERVICE": "WMS", "REQUEST": "GetFeatureInfo", "VERSION": "1.3.0", "CRS": "EPSG:4326",
-        "LAYERS": "plany,raster,wektor-str,wektor-lzb", "QUERY_LAYERS": "plany,raster,wektor-str,wektor-lzb",
-        "BBOX": f"{lat - d},{lon - d},{lat + d},{lon + d}", "WIDTH": "101", "HEIGHT": "101", "I": "50", "J": "50",
-        "INFO_FORMAT": "text/html", "FEATURE_COUNT": "10",
-    }
+    html = ""
     try:
         with client() as c:
-            html = get(c, KIMPZP, params=params).text
+            for params in _mpzp_requests(lat, lon):
+                r = c.get(KIMPZP, params=params)
+                if r.status_code == 200 and "ServiceException" not in r.text and len(r.text.strip()) > 60:
+                    html = r.text
+                    break
     except Exception as e:  # noqa: BLE001
         log.debug("kimpzp: %s", e)
+        return {}
+    if not html:
         return {}
     soup = BeautifulSoup(html, "lxml")
     text = soup.get_text("\n", strip=True)

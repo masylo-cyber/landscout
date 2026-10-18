@@ -6,7 +6,9 @@ cd "$DIR"
 
 case "${1:-help}" in
   status)  docker compose ps ;;
-  logs)    docker compose logs -f --tail=200 "${2:-scheduler}" ;;
+  logs)    docker compose logs --tail=200 "${2:-scheduler}" ;;
+  follow)  docker compose logs -f --tail=50 "${2:-scheduler}" ;;
+  diag)    docker compose run --rm scheduler landscout diag ;;
   run)     docker compose run --rm scheduler landscout run "${@:2}" ;;
   update)
     git pull --ff-only
@@ -29,7 +31,7 @@ EOF
     ;;
   *)
     cat <<EOF
-landscout status | logs [app|scheduler|db] | run [--source X] | update | restart | stop
+landscout status | logs [app|scheduler|db] | follow | diag | run [--source X] | update | restart | stop
 landscout telegram-setup | test-alert [galano|bauro] | shell | db | panel
 EOF
     ;;

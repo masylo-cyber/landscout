@@ -104,8 +104,12 @@ def all_collectors(only: str | None = None) -> list[Collector]:
     from .otodom import OtodomCollector
     from .apify_generic import apify_collectors
     from .komornik import KomornikCollector
+    from .morizon import MorizonCollector
+    from .domiporta import DomiportaCollector
+    from .adresowo import AdresowoCollector
 
-    cols: list[Collector] = [OlxCollector(), OtodomCollector(), KomornikCollector(), *apify_collectors()]
+    cols: list[Collector] = [OtodomCollector(), MorizonCollector(), DomiportaCollector(), AdresowoCollector(),
+                             OlxCollector(), KomornikCollector(), *apify_collectors()]
     if only:
         cols = [c for c in cols if c.name == only]
     return cols

@@ -12,6 +12,7 @@ case "${1:-help}" in
   stats)   docker compose run --rm scheduler landscout stats ;;
   rescore) docker compose run --rm scheduler landscout rescore "${@:2}" ;;
   run)     docker compose run --rm scheduler landscout run "${@:2}" ;;
+  analiza) docker compose run --rm scheduler landscout analiza "${@:2}" ;;
   update)
     git pull --ff-only
     install -m 755 "$DIR/bin/landscout" /usr/local/bin/landscout
@@ -40,7 +41,7 @@ EOF
   *)
     cat <<EOF
 landscout status | logs [app|scheduler|db] | follow | diag | stats | rescore [--refresh-mpzp] [--llm N] | run [--source X] | update | restart | stop
-landscout telegram-setup | reset-alerts | test-alert [galano|bauro] | shell | db | panel
+landscout analiza <url> [--send] | cleanup | telegram-setup | reset-alerts | test-alert [galano|bauro] | shell | db | panel
 EOF
     ;;
 esac

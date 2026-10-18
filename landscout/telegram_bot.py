@@ -96,6 +96,26 @@ def _set_grade(arg: str, col: str) -> str:
         return f"#{lid} {col.split('_')[0]} = {g}" + (f"\n💰 {proforma_line(pf)}" if pf else "")
 
 
+def _analiza(arg: str) -> str:
+    url = arg.strip()
+    if not url.startswith("http"):
+        return "Użycie: /analiza <link do oferty>"
+    from .adhoc import analyze_url
+    try:
+        row = analyze_url(url, force=True)
+    except Exception as e:  # noqa: BLE001
+        log.exception("analiza %s", url)
+        return f"Nie udało się: {escape(str(e))[:200]}"
+    out = []
+    for prof in ("galano", "bauro", "mw"):
+        vd = getattr(row, f"verdict_{prof}")
+        if vd != "reject" or prof == "galano":
+            out.append(card_text(row, prof))
+    if not row.lat:
+        out.append("⚠️ nie udało się zlokalizować działki – brak obszaru, MPZP i radaru rynku")
+    return "\n\n".join(out)
+
+
 def _market(arg: str) -> str:
     try:
         lid = int(arg.strip().lstrip("#"))
@@ -137,10 +157,13 @@ def handle(text: str, chat: str) -> str | None:
         return _set_grade(arg, "standard_grade" if cmd in ("/std", "/standard") else "location_grade")
     if cmd in ("/rynek", "/market"):
         return _market(arg)
+    if cmd in ("/analiza", "/analizuj", "/a"):
+        return _analiza(arg)
     if cmd in ("/pomoc", "/help"):
         return ("/status – ostatni przebieg\n/stats – liczby alertów\n/top galano|bauro|mw – 5 najlepszych\n"
                 "/ok 123 – dzwoniłem\n/nie 123 – odrzuć\n/ogledziny 123 – do oględzin\n"
-                "/std 123 4 – standard 1–5 (3 = typowy)\n/lok 123 2 – otoczenie 1–5\n/rynek 123 – radar rynku 2 km")
+                "/std 123 4 – standard 1–5 (3 = typowy)\n/lok 123 2 – otoczenie 1–5\n/rynek 123 – radar rynku 2 km\n"
+                "/analiza <link> – pełna analiza dowolnej oferty z linku")
     return None
 
 

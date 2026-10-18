@@ -28,6 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("telegram-setup", help="wykryj chat_id po /start")
     sub.add_parser("reset-alerts", help="zapomnij, co już alertowano (następny run wyśle od nowa aktualne alerty)")
     t = sub.add_parser("test-alert", help="wyślij testowy alert")
+    an = sub.add_parser("analiza", help="pełna analiza oferty z linku (+ wysyłka na Telegram)")
+    an.add_argument("url")
+    an.add_argument("--send", action="store_true", help="wyślij kartę na czat Galano/BAURO")
     t.add_argument("profile", nargs="?", default="galano")
 
     a = p.parse_args(argv)
@@ -73,6 +76,17 @@ def main(argv: list[str] | None = None) -> int:
             print("Zapisano chat_id:", found)
         else:
             print("Nie znaleziono. Napisz do bota '/start galano' lub '/start bauro' i uruchom ponownie.")
+    elif a.cmd == "analiza":
+        from .adhoc import analyze_url
+        from .notify import card_text, send_telegram
+        import re as _re
+        row = analyze_url(a.url, force=True)
+        for prof in ("galano", "bauro", "mw"):
+            txt = card_text(row, prof)
+            print(_re.sub(r"<[^>]+>", "", txt), "\n")
+            if a.send and getattr(row, f"verdict_{prof}") != "reject":
+                send_telegram(txt, prof)
+        print(f"panel: /l/{row.id}")
     elif a.cmd == "test-alert":
         from .notify import send_telegram, send_mail
         ok = send_telegram(f"✅ LandScout – test alertu ({a.profile})", a.profile)

@@ -39,6 +39,12 @@ ufw --force enable >/dev/null
 systemctl enable --now fail2ban >/dev/null
 
 say "Kod aplikacji -> $DIR"
+git config --global --add safe.directory "$DIR" >/dev/null 2>&1 || true
+if [ -d "$DIR" ] && [ ! -d "$DIR/.git" ]; then
+  # katalog założony wcześniej (np. ręcznie) – przejmujemy go i czyścimy
+  chown -R root:root "$DIR"
+  rm -rf "$DIR"
+fi
 if [ -d "$DIR/.git" ]; then
   git -C "$DIR" pull --ff-only
 else

@@ -27,6 +27,7 @@ class Settings(BaseModel):
     panel_user: str = os.environ.get("PANEL_USER", "admin")
     panel_password: str = os.environ.get("PANEL_PASSWORD", "admin")
     run_interval_min: int = int(os.environ.get("RUN_INTERVAL_MIN", "120") or 120)
+    alert_interval_days: float = float(os.environ.get("ALERT_INTERVAL_DAYS", "4") or 4)   # powiadomienia zbiorcze co N dni
     max_llm_per_run: int = int(os.environ.get("MAX_LLM_PER_RUN", "60") or 60)
     data_dir: Path = Path(os.environ.get("LANDSCOUT_DATA", "/app/data"))
 
@@ -48,6 +49,7 @@ class Area(BaseModel):
     district: str | None = None  # dzielnica Warszawy (ULDK: commune "Warszawa", region zawiera dzielnicę)
     regions: list[str] = []      # obręby ewidencyjne / miejscowości (dopasowanie po początku nazwy)
     strict: bool = False         # True: dopasowanie TYLKO po regions (brak -> poza obszarem)
+    priority: bool = False       # strefa priorytetowa: bonus w scoringu, pierwsza sekcja w powiadomieniach
 
 
 @lru_cache

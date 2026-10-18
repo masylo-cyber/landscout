@@ -103,18 +103,23 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                 errors.append(f"market: {e}")
                 log.exception("market")
 
-            # 3) alerty (tylko raz na ofertę i profil; duplikaty klastra – raz)
+            # 3) powiadomienia zbiorcze co ALERT_INTERVAL_DAYS (domyślnie 4): oferty z werdyktem "alert" po analizie LLM,
+            #    raz na ofertę i profil; duplikaty klastra – raz. Między wysyłkami kandydaci czekają (widać je w panelu).
             if not no_alerts:
                 discover_chat_ids()
-                alerted_clusters: set[str] = set()
+                from .db import kv_get, kv_set
+                from .enrich import in_profile_area_parcel as _in_area
+                from .notify import send_batch
+                last = kv_get(db, "alert_batch_at", "")
+                due = (not last) or (datetime.now(timezone.utc) - datetime.fromisoformat(last)) >= timedelta(days=s.alert_interval_days)
                 for prof, flag_col, verdict_col in (("galano", "alerted_galano", "verdict_galano"),
                                                     ("bauro", "alerted_bauro", "verdict_bauro"),
                                                     ("mw", "alerted_mw", "verdict_mw")):
                     q = select(Listing).where(Listing.active.is_(True), getattr(Listing, flag_col).is_(False),
-                                              getattr(Listing, verdict_col) == "alert")
+                                              getattr(Listing, verdict_col) == "alert", Listing.status != "rejected")
+                    cands: list[Listing] = []
                     for row in db.scalars(q):
                         if not row.analysis:
-                            # alert dopiero po analizie modelem (MPZP/PUM/marża); bez niej czeka w panelu
                             if llm_budget > 0 and analyze(row):
                                 llm_budget -= 1
                                 score(row)
@@ -123,20 +128,28 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                                     continue
                             else:
                                 continue
-                        ck = f"{prof}:{row.cluster_key}" if row.cluster_key else None
-                        if ck and ck in alerted_clusters:
-                            setattr(row, flag_col, True)
+                        cands.append(row)
+                    stats[f"pending_{prof}"] = len(cands)
+                    if not due or not cands:
+                        continue
+                    seen_clusters: set[str] = set()
+                    inside, outside = [], []
+                    for row in sorted(cands, key=lambda r: -(getattr(r, f"score_{prof}") or 0)):
+                        ck = row.cluster_key
+                        if ck and (ck in seen_clusters or db.scalar(select(Listing.id).where(Listing.cluster_key == ck,
+                                                                                            getattr(Listing, flag_col).is_(True)))):
+                            setattr(row, flag_col, True)   # ten sam grunt już wysłany / z innego portalu
                             continue
-                        if ck and db.scalar(select(Listing.id).where(Listing.cluster_key == row.cluster_key,
-                                                                     getattr(Listing, flag_col).is_(True))):
-                            setattr(row, flag_col, True)   # ten sam grunt już alertowany z innego portalu
-                            continue
-                        if alert(row, prof):
+                        if ck:
+                            seen_clusters.add(ck)
+                        (inside if _in_area(row.lat, row.lon, prof, row.parcel, row.location_text) else outside).append(row)
+                    if send_batch(prof, inside, outside):
+                        for row in inside + outside:
                             setattr(row, flag_col, True)
-                            stats[f"alerts_{prof}"] += 1
-                            if ck:
-                                alerted_clusters.add(ck)
-                            time.sleep(1.2)
+                        stats[f"alerts_{prof}"] += len(inside) + len(outside)
+                    db.commit()
+                if due:
+                    kv_set(db, "alert_batch_at", datetime.now(timezone.utc).isoformat())
                     db.commit()
                 for prof in ("galano", "bauro"):
                     try:

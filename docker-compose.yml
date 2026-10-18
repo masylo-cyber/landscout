@@ -1,5 +1,6 @@
 services:
   db:
+    logging: {driver: json-file, options: {max-size: \"20m\", max-file: \"3\"}}
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -15,6 +16,7 @@ services:
       retries: 20
 
   app:
+    logging: {driver: json-file, options: {max-size: \"20m\", max-file: \"3\"}}
     build: .
     restart: unless-stopped
     env_file: .env
@@ -31,6 +33,7 @@ services:
     command: ["landscout", "serve"]
 
   scheduler:
+    logging: {driver: json-file, options: {max-size: \"20m\", max-file: \"3\"}}
     build: .
     restart: unless-stopped
     env_file: .env

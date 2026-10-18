@@ -205,6 +205,17 @@ def match_area(lat: float, lon: float, parcel: dict | None = None, location_text
     return best[1], best[2].name, best[2].ring
 
 
+def in_priority_area(lat: float, lon: float, parcel: dict | None = None, location_text: str = "") -> bool:
+    return any(a.priority and _area_hits(a, lat, lon, parcel, location_text) for a in areas().get("galano", []))
+
+
+NEAR_CENTER = (52.23, 21.01)   # Warszawa – "spoza listy, ale blisko"
+
+
+def near_warsaw_km(lat: float, lon: float) -> float:
+    return haversine_km((lat, lon), NEAR_CENTER)
+
+
 def in_profile_area_parcel(lat: float, lon: float, profile: str, parcel: dict | None = None, location_text: str = "") -> bool:
     return any(_area_hits(a, lat, lon, parcel, location_text) for a in areas().get(profile, []))
 
@@ -215,7 +226,14 @@ LOCALITY_HINTS = {
     "złotokłos": "Złotokłos, Piaseczno, powiat piaseczyński", "bobrowiec": "Bobrowiec, Piaseczno, powiat piaseczyński",
     "walendów": "Walendów, Nadarzyn, powiat pruszkowski", "rusiec": "Rusiec, Nadarzyn, powiat pruszkowski",
     "krakowiany": "Krakowiany, Nadarzyn, powiat pruszkowski", "żółwin": "Żółwin, Brwinów, powiat pruszkowski",
-    "komorów": "Komorów, Michałowice, powiat pruszkowski", "marysin": "Marysin Wawerski, Wawer, Warszawa",
+    "komorów": "Komorów, Michałowice, powiat pruszkowski", "dawidy": "Dawidy Bankowe, Raszyn, powiat pruszkowski",
+    "michałowice-wieś": "Michałowice-Wieś, Michałowice, powiat pruszkowski", "michałowice wieś": "Michałowice-Wieś, Michałowice, powiat pruszkowski",
+    "pęcice": "Pęcice, Michałowice, powiat pruszkowski", "nowa wieś": "Nowa Wieś, Michałowice, powiat pruszkowski",
+    "reguły": "Reguły, Michałowice, powiat pruszkowski", "opacz": "Opacz-Kolonia, Michałowice, powiat pruszkowski",
+    "sokołów": "Sokołów, Michałowice, powiat pruszkowski", "mysiadło": "Mysiadło, Lesznowola, powiat piaseczyński",
+    "nowa iwiczna": "Nowa Iwiczna, Lesznowola, powiat piaseczyński", "zamienie": "Zamienie, Lesznowola, powiat piaseczyński",
+    "wilcza góra": "Wilcza Góra, Lesznowola, powiat piaseczyński", "wola mrokowska": "Wola Mrokowska, Lesznowola, powiat piaseczyński",
+    "janki": "Janki, Raszyn, powiat pruszkowski", "jaworowa": "Jaworowa, Raszyn, powiat pruszkowski", "marysin": "Marysin Wawerski, Wawer, Warszawa",
     "kierszek": "Kierszek, Konstancin-Jeziorna", "skolimów": "Skolimów, Konstancin-Jeziorna",
     "chylice": "Chylice, Konstancin-Jeziorna", "bielawa": "Bielawa, Konstancin-Jeziorna",
     "zawady": "Zawady, Wilanów, Warszawa", "powsin": "Powsin, Wilanów, Warszawa",

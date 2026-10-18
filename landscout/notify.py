@@ -241,3 +241,45 @@ def digest(profile: str, min_area: float = 1500, limit: int = 10) -> int:
             kv_set(db, f"digest_{profile}_day", today)
             kv_set(db, f"digest_{profile}_ids", ",".join(str(x) for x in list(sent_ids)[-400:] + [r.id for r in rows]))
         return len(rows) if ok else 0
+
+
+def send_batch(profile: str, rows: list, outside: list | None = None) -> bool:
+    """Zbiorcze powiadomienie: sekcje strefa priorytetowa / pozostałe obszary / poza listą. Pełne karty dla max 8,
+    reszta jedną linią."""
+    from .enrich import in_priority_area
+    head = {"galano": "🏘 GALANO", "bauro": "🌲 BAURO", "mw": "🏢 BAURO MW"}[profile]
+    prio = [r for r in rows if r.lat and in_priority_area(r.lat, r.lon, r.parcel, r.location_text)]
+    rest = [r for r in rows if r not in prio]
+    outside = outside or []
+    n = len(rows) + len(outside)
+    if not n:
+        return False
+    sections = [("⭐ strefa priorytetowa", prio), ("pozostałe obszary", rest), ("poza listą, ale ciekawe", outside)]
+    parts = [f"<b>{head} – nowe działki ({n})</b>"]
+    full_left = 8
+    for title, rs in sections:
+        if not rs:
+            continue
+        parts.append(f"\n<b>— {title} ({len(rs)}) —</b>")
+        for r in rs:
+            if full_left > 0:
+                parts.append(card_text(r, profile))
+                full_left -= 1
+            else:
+                where = (r.location_text or "").split(",")[0] or r.area_name or "?"
+                pm2 = f" · {r.price_pln / r.area_m2:,.0f} zł/m²".replace(",", " ") if r.price_pln and r.area_m2 else ""
+                parts.append(f'• <a href="{escape(r.url)}">{escape(where)}</a> · {_fmt_area(r.area_m2)} · {_fmt_price(r.price_pln)}{pm2}'
+                             f' · {getattr(r, f"score_{profile}") or 0:.0f} pkt · #{r.id}')
+    text = "\n".join(parts)
+    ok = True
+    # Telegram: limit 4096 znaków na wiadomość – tniemy po kartach
+    chunk = ""
+    for part in text.split("\n\n"):
+        if len(chunk) + len(part) + 2 > 3900:
+            ok = send_telegram(chunk, profile) and ok
+            chunk = part
+        else:
+            chunk = (chunk + "\n\n" + part) if chunk else part
+    if chunk:
+        ok = send_telegram(chunk, profile) and ok
+    return ok

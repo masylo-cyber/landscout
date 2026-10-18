@@ -9,8 +9,12 @@
 galano:
   - {name: "Piaseczno (gmina)", commune: "Piaseczno",     ring: pierscien, center: [52.08, 21.02], radius_km: 7,  olx: "piaseczno"}
   - {name: "Złotokłos",             ring: dalej,     center: [52.00, 20.95], radius_km: 4}
-  - {name: "Lesznowola (gmina)", commune: "Lesznowola",    ring: pierscien, center: [52.09, 20.93], radius_km: 6,  olx: "lesznowola"}
-  - {name: "Łazy",                  ring: pierscien, center: [52.10, 20.99], radius_km: 3}
+  - {name: "Lesznowola (gmina)", commune: "Lesznowola",    ring: pierscien, center: [52.09, 20.93], radius_km: 6,  olx: "lesznowola", priority: true}
+  - {name: "Łazy",                  ring: pierscien, center: [52.10, 20.99], radius_km: 3, priority: true}
+  - {name: "Magdalenka",            ring: pierscien, center: [52.06, 20.96], radius_km: 2.5, priority: true}
+  - {name: "Dawidy Bankowe",        ring: pierscien, center: [52.12, 20.97], radius_km: 2.5, priority: true}
+  - {name: "Michałowice-Wieś",      ring: pierscien, center: [52.17, 20.88], radius_km: 2.5, priority: true}
+  - {name: "Nowa Wieś / Pęcice",    ring: pierscien, center: [52.16, 20.85], radius_km: 2.5, priority: true}
   - {name: "Tarczyn (gmina)", commune: "Tarczyn",       ring: dalej,     center: [51.98, 20.84], radius_km: 7,  olx: "tarczyn"}
   - {name: "Nadarzyn (gmina)", commune: "Nadarzyn",      ring: pierscien, center: [52.09, 20.80], radius_km: 6,  olx: "nadarzyn"}
   - {name: "Krakowiany",            ring: dalej,     center: [52.05, 20.77], radius_km: 3}
@@ -22,8 +26,8 @@ galano:
   - {name: "Góra Kalwaria (gmina)", commune: "Góra Kalwaria", ring: dalej,     center: [51.98, 21.21], radius_km: 8,  olx: "gora-kalwaria"}
   - {name: "Prażmów (gmina)", commune: "Prażmów",       ring: dalej,     center: [51.95, 20.98], radius_km: 6,  olx: "prazmow"}
   - {name: "Grójec (gmina)", commune: "Grójec",        ring: dalej,     center: [51.86, 20.87], radius_km: 7,  olx: "grojec"}
-  - {name: "Michałowice (gmina)", commune: "Michałowice",   ring: pierscien, center: [52.16, 20.87], radius_km: 4,  olx: "michalowice"}
-  - {name: "Raszyn (gmina)", commune: "Raszyn",        ring: pierscien, center: [52.15, 20.92], radius_km: 4,  olx: "raszyn"}
+  - {name: "Michałowice (gmina)", commune: "Michałowice",   ring: pierscien, center: [52.16, 20.87], radius_km: 4,  olx: "michalowice", priority: true}
+  - {name: "Raszyn (gmina)", commune: "Raszyn",        ring: pierscien, center: [52.15, 20.92], radius_km: 4,  olx: "raszyn", priority: true}
   - {name: "Pruszków", commune: "Pruszków",              ring: pierscien, center: [52.17, 20.80], radius_km: 4,  olx: "pruszkow"}
   - {name: "Grodzisk Mazowiecki", commune: "Grodzisk Mazowiecki",   ring: dalej,     center: [52.11, 20.63], radius_km: 6,  olx: "grodzisk-mazowiecki"}
   - {name: "Ożarów Mazowiecki", commune: "Ożarów Mazowiecki",     ring: pierscien, center: [52.21, 20.80], radius_km: 5,  olx: "ozarow-mazowiecki"}

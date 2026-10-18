@@ -6,7 +6,7 @@ import re
 
 from .config import profiles
 from .db import Listing
-from .enrich import in_profile_area_parcel
+from .enrich import in_priority_area, in_profile_area_parcel, near_warsaw_km
 
 RING_DEFAULT = "dalej"
 
@@ -131,7 +131,8 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
     a = row.analysis or {}
     if not (row.lat and row.lon):
         return 15.0, "review", 0          # bez geolokacji nie alertujemy
-    if not in_profile_area_parcel(row.lat, row.lon, "galano", row.parcel, row.location_text):
+    in_area = in_profile_area_parcel(row.lat, row.lon, "galano", row.parcel, row.location_text)
+    if not in_area and near_warsaw_km(row.lat, row.lon) > prof.get("near_miss_km", 35):
         return 0.0, "reject", 0
     if row.kind not in ("dzialka", "dom_rozbiorka", "unknown", "inne") and a.get("kind") not in ("dzialka", "dom_rozbiorka"):
         return 0.0, "reject", 0
@@ -179,6 +180,10 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
         score -= 25
     if a.get("divisible") is False:
         score -= 10
+    if in_priority_area(row.lat, row.lon, row.parcel, row.location_text):
+        score += 10                                   # strefa priorytetowa (Łazy, Lesznowola, Dawidy, Michałowice…)
+    if not in_area:
+        score -= 15                                   # spoza listy obszarów: tylko bardzo dobre -> "poza listą" w powiadomieniu
     score = max(0.0, min(100.0, score))
 
     if n >= need and score >= 50 and evidence and not rural and segment_evidence(row):

@@ -16,7 +16,11 @@ case "${1:-help}" in
     git pull --ff-only
     install -m 755 "$DIR/bin/landscout" /usr/local/bin/landscout
     docker compose up -d --build
+    docker image prune -f >/dev/null 2>&1; docker builder prune -f --keep-storage 2GB >/dev/null 2>&1
     echo "Zaktualizowano do $(git rev-parse --short HEAD)" ;;
+  cleanup)
+    docker system df; docker image prune -af; docker builder prune -af; docker container prune -f
+    journalctl --vacuum-size=200M 2>/dev/null; df -h / ;;
   restart) docker compose restart ;;
   stop)    docker compose down ;;
   telegram-setup) docker compose run --rm scheduler landscout telegram-setup ;;

@@ -209,9 +209,35 @@ def in_profile_area_parcel(lat: float, lon: float, profile: str, parcel: dict | 
     return any(_area_hits(a, lat, lon, parcel, location_text) for a in areas().get(profile, []))
 
 
+# miejscowość -> gmina/powiat (dla portali podających samą nazwę wsi; Łazy są też w Kampinosie itd.)
+LOCALITY_HINTS = {
+    "łazy": "Łazy, Lesznowola, powiat piaseczyński", "magdalenka": "Magdalenka, Lesznowola, powiat piaseczyński",
+    "złotokłos": "Złotokłos, Piaseczno, powiat piaseczyński", "bobrowiec": "Bobrowiec, Piaseczno, powiat piaseczyński",
+    "walendów": "Walendów, Nadarzyn, powiat pruszkowski", "rusiec": "Rusiec, Nadarzyn, powiat pruszkowski",
+    "krakowiany": "Krakowiany, Nadarzyn, powiat pruszkowski", "żółwin": "Żółwin, Brwinów, powiat pruszkowski",
+    "komorów": "Komorów, Michałowice, powiat pruszkowski", "marysin": "Marysin Wawerski, Wawer, Warszawa",
+    "kierszek": "Kierszek, Konstancin-Jeziorna", "skolimów": "Skolimów, Konstancin-Jeziorna",
+    "chylice": "Chylice, Konstancin-Jeziorna", "bielawa": "Bielawa, Konstancin-Jeziorna",
+    "zawady": "Zawady, Wilanów, Warszawa", "powsin": "Powsin, Wilanów, Warszawa",
+    "anin": "Anin, Wawer, Warszawa", "radość": "Radość, Wawer, Warszawa", "falenica": "Falenica, Wawer, Warszawa",
+    "pyry": "Pyry, Ursynów, Warszawa", "jeziorki": "Jeziorki, Ursynów, Warszawa",
+}
+_STRIP = re.compile(r"^\s*(działka|dzialka|grunt|teren)\b[^A-ZŁŚŻŹĆŃÓĄĘ]*", re.I)
+
+
 def _geocode_variants(text: str) -> list[str]:
-    parts = [p.strip() for p in (text or "").split(",") if p.strip()]
-    out = [text] if text else []
+    text = _STRIP.sub("", text or "").strip(" ,·-")
+    text = re.sub(r"\b(na sprzedaż|przez agenta|bezpośrednio)\b", "", text, flags=re.I).strip(" ,·-")
+    parts = [p.strip() for p in text.split(",") if p.strip()]
+    out: list[str] = []
+    low = text.lower()
+    for key, hint in LOCALITY_HINTS.items():
+        if re.search(rf"\b{key}\b", low):
+            m = re.search(r"\b(ul\.?|al\.?)\s+[^,·]+", text, re.I)
+            out.append(f"{m.group(0).strip()}, {hint}" if m else hint)
+            break
+    if text:
+        out.append(text)
     if parts and parts[0].lower().startswith("ul"):
         out.append(", ".join(parts[1:]))          # bez ulicy
     if len(parts) >= 2:

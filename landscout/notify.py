@@ -197,3 +197,40 @@ def discover_chat_ids() -> dict[str, str]:
             for p, chat in found.items():
                 kv_set(db, f"tg_chat_{p}", chat)
     return found
+
+
+def digest(profile: str, min_area: float = 1500, limit: int = 10) -> int:
+    """Raz dziennie: skrót ofert 'do przejrzenia' (bez dowodu na bliźniaki/szeregi, ale w obszarze i z sensownym metrażem),
+    których nie było w poprzednich skrótach. Zwraca liczbę wysłanych pozycji."""
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from .db import kv_get, kv_set
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    with session() as db:
+        if kv_get(db, f"digest_{profile}_day", "") == today:
+            return 0
+        sent_ids = set(int(x) for x in (kv_get(db, f"digest_{profile}_ids", "") or "").split(",") if x)
+        vd = getattr(Listing, f"verdict_{profile}")
+        sc = getattr(Listing, f"score_{profile}")
+        rows = db.scalars(select(Listing).where(Listing.active.is_(True), vd == "review", Listing.area_name.isnot(None),
+                                                Listing.area_m2 >= min_area, Listing.status.notin_(["rejected"]),
+                                                getattr(Listing, f"alerted_{profile}").is_(False))
+                          .order_by(sc.desc()).limit(limit * 3)).all()
+        rows = [r for r in rows if r.id not in sent_ids][:limit]
+        if not rows:
+            kv_set(db, f"digest_{profile}_day", today)
+            return 0
+        head = {"galano": "🏘 GALANO", "bauro": "🌲 BAURO", "mw": "🏢 BAURO MW"}[profile]
+        lines = [f"<b>{head} – do przejrzenia ({today})</b> · bez potwierdzenia w planie, ale w obszarze:"]
+        for r in rows:
+            where = (r.location_text or "").split(",")[0] or r.area_name
+            if r.area_name and r.area_name.split(" (")[0] not in where:
+                where += f" ({r.area_name.split(' (')[0]})"
+            pm2 = f" · {r.price_pln / r.area_m2:,.0f} zł/m²".replace(",", " ") if r.price_pln and r.area_m2 else ""
+            lines.append(f'• <a href="{escape(r.url)}">{escape(where)}</a> · {_fmt_area(r.area_m2)} · {_fmt_price(r.price_pln)}{pm2}'
+                         f' · MPZP: {escape(_zoning(r))} · #{r.id}')
+        ok = send_telegram("\n".join(lines), profile)
+        if ok:
+            kv_set(db, f"digest_{profile}_day", today)
+            kv_set(db, f"digest_{profile}_ids", ",".join(str(x) for x in list(sent_ids)[-400:] + [r.id for r in rows]))
+        return len(rows) if ok else 0

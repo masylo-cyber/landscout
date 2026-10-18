@@ -13,7 +13,7 @@ from .config import settings
 from .db import Listing, RunLog, init_db, session
 from .enrich import enrich, in_profile_area_parcel, match_area, mpzp_by_xy
 from .normalize import upsert
-from .notify import alert, discover_chat_ids, send_telegram
+from .notify import alert, digest, discover_chat_ids, send_telegram
 from .scoring import score
 
 log = logging.getLogger("landscout.run")
@@ -119,6 +119,11 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                                 alerted_clusters.add(ck)
                             time.sleep(1.2)
                     db.commit()
+                for prof in ("galano", "bauro"):
+                    try:
+                        stats[f"digest_{prof}"] = digest(prof)
+                    except Exception as e:  # noqa: BLE001
+                        errors.append(f"digest {prof}: {e}")
 
             runlog.finished = datetime.now(timezone.utc)
             runlog.stats = stats | {"seconds": round(time.time() - t0)}

@@ -22,7 +22,7 @@ log = logging.getLogger("landscout.run")
 def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = False) -> dict:
     init_db()
     s = settings()
-    stats = {"collected": 0, "new": 0, "enriched": 0, "analyzed": 0, "alerts_galano": 0, "alerts_bauro": 0}
+    stats = {"collected": 0, "new": 0, "enriched": 0, "analyzed": 0, "alerts_galano": 0, "alerts_bauro": 0, "alerts_mw": 0}
     errors: list[str] = []
     t0 = time.time()
 
@@ -162,9 +162,16 @@ def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = 
 
 def loop() -> None:
     s = settings()
+    from .telegram_bot import poll_once
     while True:
         try:
             run()
         except Exception:  # noqa: BLE001
             log.exception("run failed")
-        time.sleep(max(s.run_interval_min, 10) * 60)
+        deadline = time.time() + max(s.run_interval_min, 10) * 60
+        while time.time() < deadline:
+            try:
+                poll_once()
+            except Exception:  # noqa: BLE001
+                log.exception("bot poll failed")
+            time.sleep(20)

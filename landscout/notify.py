@@ -79,8 +79,11 @@ def card_text(row: Listing, profile: str) -> str:
         lines.append("⚠️ " + escape("; ".join(a["risks"][:3]))[:160])
     pf = row.proforma_galano if profile == "galano" else row.proforma_bauro
     if pf:
-        from .proforma import proforma_line
+        from .proforma import proforma_line, fmt_mln
         lines.append("💰 " + proforma_line(pf))
+    if profile == "bauro" and row.segments_est and row.segments_est >= 3 and row.proforma_galano:
+        from .proforma import fmt_mln
+        lines.append(f"↔ wariant Galano: {row.segments_est} segm., marża {fmt_mln(row.proforma_galano.get('margin'))}")
     summ = _short_summary(a)
     if summ:
         lines.append(escape(summ))

@@ -228,6 +228,10 @@ def score(row: Listing) -> None:
     row.score_bauro, row.verdict_bauro = b, vb
     row.proforma_galano = proforma(row, "galano") if vg != "reject" else {}
     row.proforma_bauro = proforma(row, "bauro") if vb != "reject" else {}
+    # profile rozłączne: obręb BAURO -> alert tylko BAURO (Galano najwyżej "review", bez alertu)
+    in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text))
+    if in_bauro and vb != "reject" and vg == "alert":
+        row.verdict_galano = vg = "review"
     # marża koryguje wynik i werdykt
     for prof in ("galano", "bauro"):
         pf = getattr(row, f"proforma_{prof}")

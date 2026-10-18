@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+from bs4 import BeautifulSoup
+
 from .collectors.base import client
 from .collectors.olx import BASE as OLX_BASE, PARAMS as OLX_PARAMS, _ads, _state
 from .collectors.otodom import URL as OTODOM_URL, _items
@@ -117,32 +119,19 @@ def diag() -> None:
                     print("  ścieżki /xxx w pobliżu 'strapi':", sorted(set(re.findall(r'strapi[^;]{0,200}?["`\'](/[a-z][a-z0-9_\-/]{2,40})', js)))[:30])
                 except Exception as e:  # noqa: BLE001
                     print("  skrypt błąd:", e)
-            base = "https://licytacje.komornik.pl/services/endpoint-notice/api"
-            for probe in ("", "/notices", "/notices/search", "/notice", "/auctions", "/search", "/public/notices",
-                          "/notices?page=0&size=5", "/notices/list", "/v3/api-docs", "/swagger-ui/index.html", "/notices/filter"):
-                try:
-                    r2 = c.get(base + probe, headers={"Accept": "application/json"})
-                    print(f"  api{probe or '/'}: {r2.status_code} {r2.text[:150]!r}")
-                except Exception as e:  # noqa: BLE001
-                    print("  api błąd:", probe, e)
-            try:
-                r2 = c.post(base + "/notices/search", json={"page": 0, "size": 5}, headers={"Accept": "application/json"})
-                print(f"  POST /notices/search: {r2.status_code} {r2.text[:200]!r}")
-            except Exception as e:  # noqa: BLE001
-                print("  POST błąd:", e)
-            links = sorted(set(re.findall(r'href="(/[^"#?]{3,80})"', html)))
-            print("linki wewnętrzne (bez _nuxt):", [l for l in links if "/_nuxt/" not in l][:30])
-            cand = [l for l in links if re.search(r"nieruchom|licytac|obwieszcz|szukaj|wyszuk|lista|items", l, re.I)][:3] or links[:2]
-            for l in cand:
-                try:
-                    r2 = c.get("https://licytacje.komornik.pl" + l)
-                    h2 = r2.text
-                    nd = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', h2, re.S)
-                    api = sorted(set(re.findall(r'https?://[a-z0-9.-]*komornik\.pl/[^"\'\s<>]{3,80}', h2)))
-                    print(f"  {l}: status={r2.status_code} len={len(h2)} NUXT_DATA={len(nd.group(1)) if nd else 0} api_urls={api[:10]}")
-                    if nd:
-                        print("   próbka:", nd.group(1)[:600])
-                except Exception as e:  # noqa: BLE001
-                    print("  błąd", l, e)
+            ids = sorted({int(m) for m in re.findall(r'href="/licytacje/(\d+)/', html)})
+            print("ID licytacji na stronie głównej:", ids[:5], "...", ids[-5:])
+            if ids:
+                r2 = c.get(f"https://licytacje.komornik.pl/licytacje/{ids[-1]}/x")
+                soup = BeautifulSoup(r2.text, "lxml")
+                for t in soup(["script", "style", "noscript", "svg"]):
+                    t.decompose()
+                txt = re.sub(r"\s+", " ", soup.get_text(" ", strip=True))
+                print(f"strona {ids[-1]}: status={r2.status_code} len_html={len(r2.text)} len_txt={len(txt)}")
+                print("TEKST:", txt[:2500])
+                print("H1/H2:", [h.get_text(' ', strip=True)[:80] for h in soup.find_all(["h1", "h2", "h3"])][:15])
+                print("meta:", {m.get("property") or m.get("name"): (m.get("content") or "")[:120] for m in soup.find_all("meta") if (m.get("property") or m.get("name") or "").startswith(("og:", "description"))})
+                r3 = c.get(f"https://licytacje.komornik.pl/licytacje/{ids[-1] + 50}/x")
+                print(f"strona {ids[-1] + 50} (poza zakresem?): status={r3.status_code} len={len(r3.text)}")
         except Exception as e:  # noqa: BLE001
             print("błąd:", e)

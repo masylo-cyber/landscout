@@ -117,8 +117,21 @@ def diag() -> None:
                     print("  ścieżki /xxx w pobliżu 'strapi':", sorted(set(re.findall(r'strapi[^;]{0,200}?["`\'](/[a-z][a-z0-9_\-/]{2,40})', js)))[:30])
                 except Exception as e:  # noqa: BLE001
                     print("  skrypt błąd:", e)
+            base = "https://licytacje.komornik.pl/services/endpoint-notice/api"
+            for probe in ("", "/notices", "/notices/search", "/notice", "/auctions", "/search", "/public/notices",
+                          "/notices?page=0&size=5", "/notices/list", "/v3/api-docs", "/swagger-ui/index.html", "/notices/filter"):
+                try:
+                    r2 = c.get(base + probe, headers={"Accept": "application/json"})
+                    print(f"  api{probe or '/'}: {r2.status_code} {r2.text[:150]!r}")
+                except Exception as e:  # noqa: BLE001
+                    print("  api błąd:", probe, e)
+            try:
+                r2 = c.post(base + "/notices/search", json={"page": 0, "size": 5}, headers={"Accept": "application/json"})
+                print(f"  POST /notices/search: {r2.status_code} {r2.text[:200]!r}")
+            except Exception as e:  # noqa: BLE001
+                print("  POST błąd:", e)
             links = sorted(set(re.findall(r'href="(/[^"#?]{3,80})"', html)))
-            print("linki wewnętrzne:", links[:40])
+            print("linki wewnętrzne (bez _nuxt):", [l for l in links if "/_nuxt/" not in l][:30])
             cand = [l for l in links if re.search(r"nieruchom|licytac|obwieszcz|szukaj|wyszuk|lista|items", l, re.I)][:3] or links[:2]
             for l in cand:
                 try:

@@ -6,7 +6,11 @@ import re
 import time
 from datetime import datetime, timezone
 
-from bs4 import BeautifulSoup
+import warnings
+
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 from .collectors.base import client, get, log
 from .config import Area, areas
@@ -17,7 +21,8 @@ GUGIK_GEOCODE = "https://services.gugik.gov.pl/uug/"
 ULDK = "https://uldk.gugik.gov.pl/"
 KIMPZP = "https://integracja.gugik.gov.pl/cgi-bin/KrajowaIntegracjaMiejscowychPlanowZagospodarowaniaPrzestrzennego"
 
-ZONING = re.compile(r"\b(\d{0,3}\s?(?:MN[a-zA-Z/]*|MW[a-zA-Z/]*|U[a-zA-Z/]*|MN/U|U/MN|RM|R|ZL|ZP|ZN|P|PU|KD[A-Z-]*|WS|ZD))\b")
+# symbol przeznaczenia: opcjonalny numer + litery wielkie (MN, MNU, MN/U, 3MNe, RM, ZL, U, P, KDD...) jako osobny token
+ZONING = re.compile(r"(?<![A-Za-ząćęłńóśźż])(\d{0,3}(?:MN[a-zA-Z]{0,3}(?:/U)?|MW[a-zA-Z]{0,2}|U(?:/MN)?|RM|R|ZL|ZP|ZN|P|PU|KD[A-Z]{0,3}|WS|ZD))(?![a-ząćęłńóśźż])")
 
 _last_nominatim = 0.0
 
@@ -140,7 +145,8 @@ def mpzp_by_xy(lat: float, lon: float) -> dict:
         if len(tds) >= 2 and tds[0]:
             kv[tds[0][:60]] = tds[1][:300]
     links = [a.get("href") for a in soup.select("a[href]") if a.get("href", "").startswith("http")]
-    syms = sorted({m.group(1).replace(" ", "") for m in ZONING.finditer(text)})
+    sym_src = " ".join(v for k, v in kv.items() if re.search(r"przeznacz|symbol|oznacz|funkc", k, re.I))
+    syms = sorted({m.group(1) for m in ZONING.finditer(sym_src)}) if sym_src else []
     return {"has_plan": True, "fields": kv, "links": links[:5], "symbols": syms[:10], "raw": text[:1500]}
 
 

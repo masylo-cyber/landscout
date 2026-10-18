@@ -31,6 +31,20 @@ def non_residential(row: Listing) -> bool:
     return bool(NON_RESIDENTIAL.search(row.title) or NON_RESIDENTIAL.search(zon)) and not RESIDENTIAL.search(text)
 
 
+# zabudowa ekstensywna / rezydencjonalna / wolnostojąca – segmenty wykluczone
+NO_SEGMENTS = re.compile(r"\bMNE\d*\b|\bMNe\b|\bMNR\b|ekstensywn|rezydencjonaln|tylko (?:zabudowa )?wolnostoj|wy[łl][ąa]cznie (?:zabudowa )?wolnostoj|"
+                         r"zakaz (?:zabudowy )?(?:bli[źz]niacz|szeregow)|bez mo[żz]liwo[śs]ci (?:zabudowy )?(?:bli[źz]niacz|szeregow)|min\.? ?(?:pow\.? )?dzia[łl]ki (?:1[2-9]|[2-9]\d)\d\d ?m", re.I)
+
+
+def no_segments(row: Listing) -> bool:
+    a = row.analysis or {}
+    allowed = a.get("allowed_types") or []
+    if allowed and "blizniak" not in allowed and "szeregowy" not in allowed:
+        return True
+    syms = " ".join((row.mpzp or {}).get("symbols") or []) + " " + (a.get("zoning_symbol") or "")
+    return bool(NO_SEGMENTS.search(f"{row.title} {row.description} {syms}"))
+
+
 def build_evidence(row: Listing) -> bool:
     a = row.analysis or {}
     mp = row.mpzp or {}
@@ -111,6 +125,10 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
     rural = is_rural(row)
     if non_residential(row):
         return 10.0, "reject", 0
+    if no_segments(row):
+        # MN ekstensywne / tylko wolnostojące – dla Galano najwyżej do przeglądu (domy pojedyncze)
+        n_single = int((row.area_m2 or 0) * prof.get("usable_factor", 0.85) // prof["m2_per_segment"]["wolnostojacy"])
+        return round(min(40.0, 10 + n_single * 6), 1), ("review" if n_single >= 3 else "reject"), n_single
     if rural and not evidence:
         n = min(n, 2)   # bez planu/WZ nie liczymy segmentów z czystej powierzchni
 

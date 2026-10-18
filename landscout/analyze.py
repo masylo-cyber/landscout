@@ -16,6 +16,9 @@ nieruchomości pod kątem dwóch celów:
    które realnie da się postawić).
 2) BAURO – działki pod pojedyncze domy premium (Magdalenka, Konstancin, Wilanów, droższe dzielnice Warszawy).
 Odpowiadasz WYŁĄCZNIE poprawnym JSON-em wg schematu, bez komentarzy. Jeśli czegoś nie da się ustalić, wpisz null.
+Ważne reguły: symbole MNE/MNe/MNR, "ekstensywna", "rezydencjonalna", "tylko wolnostojąca" => allowed_types bez blizniak/szeregowy
+i galano_segments_estimate = liczba domów wolnostojących (min. ~1000 m² na dom, chyba że plan mówi inaczej).
+Bez MPZP/WZ nie zakładaj, że można budować. Sąsiedztwo S7/S8/A2, torów, linii WN obniża bauro_fit.
 Nie zgaduj przeznaczenia w MPZP, jeśli tekst go nie podaje – wpisz null i oznacz w ryzykach."""
 
 SCHEMA = """{
@@ -39,7 +42,7 @@ SCHEMA = """{
  "galano_fit": 0-100,
  "bauro_fit": 0-100,
  "risks": ["krótkie hasła"],
- "summary_pl": "3-4 zdania po polsku dla inwestora: co to jest, ile można postawić / dla kogo, co sprawdzić najpierw"
+ "summary_pl": "maks. 2 krótkie zdania po polsku, konkret dla inwestora: werdykt (dla kogo i dlaczego) + jedna rzecz do sprawdzenia. Bez powtarzania ceny/powierzchni."
 }"""
 
 

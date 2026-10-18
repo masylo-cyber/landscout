@@ -25,30 +25,64 @@ def _fmt_area(a: float | None) -> str:
     return f"{a:,.0f} m²".replace(",", " ") if a else "pow.: brak"
 
 
+def _zoning(row: Listing) -> str:
+    a = row.analysis or {}
+    mp = row.mpzp or {}
+    if a.get("zoning_symbol"):
+        return str(a["zoning_symbol"])
+    if mp.get("symbols"):
+        return ", ".join(mp["symbols"])
+    if mp.get("has_plan"):
+        return "plan jest (symbol nieznany)"
+    if mp.get("has_plan") is False:
+        return "brak planu → WZ"
+    return "?"
+
+
+def _short_summary(a: dict) -> str:
+    """1–2 zdania z analizy modelu – pierwsze zdania summary_pl."""
+    txt = (a.get("summary_pl") or "").strip()
+    if not txt:
+        return ""
+    parts = [p.strip() for p in txt.replace("\n", " ").split(". ") if p.strip()]
+    out = ". ".join(parts[:2])
+    return (out + ("." if not out.endswith(".") else ""))[:260]
+
+
 def card_text(row: Listing, profile: str) -> str:
     a = row.analysis or {}
-    price_m2 = f" ({row.price_pln / row.area_m2:,.0f} zł/m²)".replace(",", " ") if row.price_pln and row.area_m2 else ""
     head = "🏘 GALANO" if profile == "galano" else "🌲 BAURO"
     sc = row.score_galano if profile == "galano" else row.score_bauro
-    lines = [f"<b>{head} · {sc:.0f}/100</b>",
-             f"<b>{escape(row.title[:120])}</b>",
-             f"{_fmt_price(row.price_pln)}{price_m2} · {_fmt_area(row.area_m2)}",
-             f"📍 {escape(row.area_name or row.location_text or '')}"]
-    if profile == "galano" and row.segments_est:
-        lines.append(f"🏗 szac. segmentów: <b>{row.segments_est}</b> (próg dla {row.ring or '?'})")
-    mp = row.mpzp or {}
-    z = a.get("zoning_symbol") or ", ".join(mp.get("symbols") or []) or ("plan jest" if mp.get("has_plan") else "brak danych")
-    lines.append(f"📜 MPZP: {escape(str(z))}")
-    if row.parcel_id:
-        lines.append(f"🧭 działka: {escape(row.parcel_id)}")
-    if a.get("summary_pl"):
-        lines.append(f"\n{escape(a['summary_pl'])}")
+    price = _fmt_price(row.price_pln)
+    pm2 = f" · {row.price_pln / row.area_m2:,.0f} zł/m²".replace(",", " ") if row.price_pln and row.area_m2 else ""
+    where = row.area_name or row.location_text or "?"
+    if row.area_name and row.location_text and row.location_text.split(",")[0] not in row.area_name:
+        where = f"{row.location_text.split(',')[0]}, {row.area_name}"
+    lines = [f"<b>{head} {sc:.0f}</b> · {escape(where)}",
+             f"<b>{price}</b>{pm2} · {_fmt_area(row.area_m2)}"]
+    if profile == "galano":
+        lines.append(f"🏗 <b>{row.segments_est or '?'} segm.</b> · MPZP: {escape(_zoning(row))}")
+    else:
+        lines.append(f"MPZP: {escape(_zoning(row))}")
+    extras = []
+    if a.get("road_access"):
+        extras.append(f"dojazd: {a['road_access']}")
+    ut = a.get("utilities") or {}
+    med = [k for k, v in (("woda", ut.get("water")), ("kanal.", ut.get("sewage")), ("gaz", ut.get("gas")), ("prąd", ut.get("power"))) if v]
+    if med:
+        extras.append("media: " + ", ".join(med))
+    if a.get("seller"):
+        extras.append(a["seller"])
+    if extras:
+        lines.append(escape(" · ".join(extras)))
     if a.get("risks"):
-        lines.append("⚠️ " + "; ".join(escape(r) for r in a["risks"][:4]))
-    lines.append(f"\n🔗 {escape(row.url)}")
-    if row.lat and row.lon:
-        lines.append(f"🗺 https://maps.google.com/?q={row.lat},{row.lon}")
-    lines.append(f"źródło: {row.source} · #{row.id}")
+        lines.append("⚠️ " + escape("; ".join(a["risks"][:3]))[:160])
+    summ = _short_summary(a)
+    if summ:
+        lines.append(escape(summ))
+    lines.append(f'<a href="{escape(row.url)}">▶ oferta ({row.source})</a>'
+                 + (f' · <a href="https://maps.google.com/?q={row.lat},{row.lon}">mapa</a>' if row.lat and row.lon else "")
+                 + f" · #{row.id}")
     return "\n".join(lines)
 
 
@@ -68,13 +102,16 @@ def send_telegram(text: str, profile: str, photo: str | None = None) -> bool:
         return False
     try:
         with httpx.Client(timeout=30) as c:
-            if photo:
+            if photo and len(text) <= 1000:
                 r = c.post(TG.format(token=s.telegram_bot_token, method="sendPhoto"),
-                           data={"chat_id": chat, "photo": photo, "caption": text[:1000], "parse_mode": "HTML"})
+                           data={"chat_id": chat, "photo": photo, "caption": text, "parse_mode": "HTML"})
                 if r.status_code == 200:
                     return True
+            # tekst zawsze w całości; podgląd zdjęcia z oferty daje link
             r = c.post(TG.format(token=s.telegram_bot_token, method="sendMessage"),
                        data={"chat_id": chat, "text": text[:4000], "parse_mode": "HTML", "disable_web_page_preview": False})
+            if r.status_code != 200:
+                log.warning("telegram sendMessage %s: %s", r.status_code, r.text[:200])
             return r.status_code == 200
     except Exception as e:  # noqa: BLE001
         log.warning("telegram: %s", e)

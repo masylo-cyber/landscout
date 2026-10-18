@@ -26,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     rs.add_argument("--llm", type=int, default=0, help="ile brakujących analiz modelem dorobić")
     rs.add_argument("--regeocode", action="store_true", help="oferty poza obszarem z samą ulicą -> ponowne geokodowanie przy następnym run")
     sub.add_parser("telegram-setup", help="wykryj chat_id po /start")
+    sub.add_parser("reset-alerts", help="zapomnij, co już alertowano (następny run wyśle od nowa aktualne alerty)")
     t = sub.add_parser("test-alert", help="wyślij testowy alert")
     t.add_argument("profile", nargs="?", default="galano")
 
@@ -55,6 +56,14 @@ def main(argv: list[str] | None = None) -> int:
         from .db import init_db
         init_db()
         print("ok")
+    elif a.cmd == "reset-alerts":
+        from sqlalchemy import update
+        from .db import Listing, init_db, session
+        init_db()
+        with session() as db:
+            n = db.execute(update(Listing).values(alerted_galano=False, alerted_bauro=False, alerted_mw=False)).rowcount
+            db.commit()
+        print(f"zresetowano flagi alertów: {n} ofert")
     elif a.cmd == "telegram-setup":
         from .db import init_db
         from .notify import discover_chat_ids

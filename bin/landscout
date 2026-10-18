@@ -20,6 +20,7 @@ case "${1:-help}" in
   restart) docker compose restart ;;
   stop)    docker compose down ;;
   telegram-setup) docker compose run --rm scheduler landscout telegram-setup ;;
+  reset-alerts)   docker compose run --rm scheduler landscout reset-alerts ;;
   test-alert)     docker compose run --rm scheduler landscout test-alert "${@:2}" ;;
   shell)   docker compose run --rm scheduler bash ;;
   db)      docker compose exec db psql -U landscout landscout ;;
@@ -35,7 +36,7 @@ EOF
   *)
     cat <<EOF
 landscout status | logs [app|scheduler|db] | follow | diag | stats | rescore [--refresh-mpzp] [--llm N] | run [--source X] | update | restart | stop
-landscout telegram-setup | test-alert [galano|bauro] | shell | db | panel
+landscout telegram-setup | reset-alerts | test-alert [galano|bauro] | shell | db | panel
 EOF
     ;;
 esac

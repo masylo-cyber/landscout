@@ -34,15 +34,41 @@ URL = "https://www.otodom.pl/pl/wyniki/sprzedaz/{estate}/{loc}?{extra}&by=LATEST
 NEXT_RE = re.compile(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', re.S)
 
 
+def _find_items(node, depth=0) -> list[dict]:
+    """Szuka w JSON listy ogłoszeń: lista słowników z polami id + (title lub slug) + area/price."""
+    if depth > 12:
+        return []
+    if isinstance(node, dict):
+        sa = node.get("searchAds")
+        if isinstance(sa, dict) and isinstance(sa.get("items"), list):
+            return sa["items"]
+        for v in node.values():
+            r = _find_items(v, depth + 1)
+            if r:
+                return r
+    elif isinstance(node, list) and node and all(isinstance(x, dict) for x in node[:3]):
+        x = node[0]
+        if "id" in x and ("slug" in x or "title" in x) and ("areaInSquareMeters" in x or "totalPrice" in x or "estate" in x):
+            return node
+        for v in node[:3]:
+            r = _find_items(v, depth + 1)
+            if r:
+                return r
+    return []
+
+
 def _items(html: str) -> list[dict]:
     m = NEXT_RE.search(html)
     if not m:
         return []
     try:
         data = json.loads(m.group(1))
-        return data["props"]["pageProps"]["data"]["searchAds"]["items"]
     except Exception:  # noqa: BLE001
         return []
+    try:
+        return data["props"]["pageProps"]["data"]["searchAds"]["items"]
+    except Exception:  # noqa: BLE001
+        return _find_items(data)
 
 
 class OtodomCollector(Collector):

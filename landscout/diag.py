@@ -25,6 +25,12 @@ def diag() -> None:
                 print("fragment:", html[:300].replace("\n", " "))
         except Exception as e:  # noqa: BLE001
             print("błąd:", e)
+        from .collectors.olx import API, API_HEADERS
+        try:
+            r = c.get(API.format(offset=0, q="piaseczno"), headers=API_HEADERS)
+            print(f"OLX API: status={r.status_code} len={len(r.text)} fragment={r.text[:160]!r}")
+        except Exception as e:  # noqa: BLE001
+            print("OLX API błąd:", e)
 
         print("\n== OTODOM ==")
         url = OTODOM_URL.format(estate="dzialka", loc="mazowieckie/piaseczynski", extra="areaMin=600", page=1)
@@ -35,9 +41,20 @@ def diag() -> None:
             print(f"status={r.status_code} len={len(html)} final_url={r.url}")
             print(f"__NEXT_DATA__: {'tak' if '__NEXT_DATA__' in html else 'nie'}; items={len(items)}")
             if "__NEXT_DATA__" in html and not items:
+                import json
                 m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.S)
-                js = m.group(1) if m else ""
-                print("klucze w pageProps:", re.findall(r'"(\w+)":', js[js.find('"pageProps"'):js.find('"pageProps"') + 400])[:15])
+                try:
+                    data = json.loads(m.group(1))
+                    pp = data.get("props", {}).get("pageProps", {})
+                    print("klucze pageProps:", list(pp.keys())[:25])
+                    for k, v in pp.items():
+                        if isinstance(v, dict):
+                            print(f"  {k}: {list(v.keys())[:15]}")
+                    print("wystąpienia 'searchAds':", m.group(1).count("searchAds"), " 'areaInSquareMeters':", m.group(1).count("areaInSquareMeters"))
+                except Exception as e:  # noqa: BLE001
+                    print("JSON błąd:", e)
+            else:
+                print("przykład:", {k: items[0].get(k) for k in list(items[0].keys())[:12]} if items else "-")
             if not items:
                 print("tytuł strony:", re.search(r"<title>(.*?)</title>", html, re.S).group(1)[:120] if "<title>" in html else "-")
                 print("fragment:", html[:300].replace("\n", " "))
@@ -46,8 +63,11 @@ def diag() -> None:
 
         print("\n== KOMORNIK ==")
         try:
-            r = c.get("https://elicytacje.komornik.pl/items?category=nieruchomosci&province=mazowieckie&page=0")
-            print(f"status={r.status_code} len={len(r.text)} final_url={r.url}")
-            print("fragment:", r.text[:300].replace("\n", " "))
+            r = c.get("https://licytacje.komornik.pl/")
+            html = r.text
+            print(f"status={r.status_code} len={len(html)} final_url={r.url}")
+            print("linki /api i ścieżki:", sorted(set(re.findall(r'["\'](/(?:api|v\d|items|nieruchomosci|obwieszczenia)[^"\'\s<>]{0,80})', html)))[:25])
+            print("hosty api:", sorted(set(re.findall(r'https?://[a-z0-9.-]*api[a-z0-9.-]*\.[a-z]+[^"\'\s<>]{0,60}', html)))[:10])
+            print("skrypty:", re.findall(r'src="([^"]+\.js)"', html)[:6])
         except Exception as e:  # noqa: BLE001
             print("błąd:", e)

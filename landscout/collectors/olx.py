@@ -15,6 +15,10 @@ from .base import Collector, RawOffer, area_from_text, client, get, log, to_floa
 
 BASE = "https://www.olx.pl/nieruchomosci/dzialki/sprzedaz/{region}/"
 PARAMS = "?search%5Bfilter_float_m%3Afrom%5D=600&search%5Border%5D=created_at%3Adesc&page={page}"
+API = ("https://www.olx.pl/api/v1/offers/?offset={offset}&limit=40&category_id=243"
+       "&region_id=4&filter_float_m%3Afrom=600&sort_by=created_at%3Adesc&query={q}")
+API_HEADERS = {"Accept": "application/json", "User-Agent": "okhttp/4.12.0", "X-Platform-Type": "mobile-html5",
+               "X-Device-Type": "mobile", "Accept-Language": "pl"}
 STATE_RE = re.compile(r'window\.__PRERENDERED_STATE__\s*=\s*"(.*?)";\s*\n', re.S)
 
 
@@ -54,6 +58,28 @@ class OlxCollector(Collector):
 
     def collect(self) -> Iterable[RawOffer]:
         with client() as c:
+            # 1) API mobilne (często nieblokowane dla IP serwerowych)
+            got_api = False
+            for region in self.regions:
+                for page in range(self.pages):
+                    try:
+                        r = c.get(API.format(offset=page * 40, q=region.replace("-", " ")), headers=API_HEADERS)
+                        if r.status_code != 200:
+                            break
+                        ads = r.json().get("data") or []
+                    except Exception as e:  # noqa: BLE001
+                        log.debug("olx api %s: %s", region, e)
+                        break
+                    if not ads:
+                        break
+                    got_api = True
+                    for ad in ads:
+                        yield self._to_offer(ad, region)
+                    if len(ads) < 40:
+                        break
+            if got_api:
+                return
+            # 2) strona HTML z osadzonym stanem
             for region in self.regions:
                 for page in range(1, self.pages + 1):
                     url = BASE.format(region=region) + PARAMS.format(page=page)

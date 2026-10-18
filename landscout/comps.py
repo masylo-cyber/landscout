@@ -36,14 +36,20 @@ def _to_comp(it: dict, kind: str, market: str) -> dict | None:
         pm2 = price / area
     rg = (loc.get("reverseGeocoding") or {}).get("locations") or []
     full = max((x.get("fullName") or "" for x in rg), key=len, default="")
-    dev = it.get("developmentTitle") or (it.get("development") or {}).get("name") if isinstance(it.get("development"), dict) else it.get("developmentTitle")
+    dev = it.get("developmentTitle") or ((it.get("development") or {}).get("name") if isinstance(it.get("development"), dict) else None) or None
+    pf = it.get("priceFromPerSquareMeter")
+    raw = {k: it.get(k) for k in ("investmentUnitsNumber", "investmentState", "investmentEstimatedDelivery", "estate",
+                                  "investmentUnitsAreaInSquareMeters") if it.get(k) is not None}
+    if isinstance(pf, dict) and pf.get("value"):
+        raw["price_from_m2"] = to_float(pf.get("value"))
+        pm2 = pm2 or raw["price_from_m2"]
     ag = it.get("agency") or {}
     slug = it.get("slug") or ""
     return dict(source="otodom", external_id=str(it.get("id")), kind=kind, market=market.lower(),
                 url=f"https://www.otodom.pl/pl/oferta/{slug}" if slug else f"https://www.otodom.pl/pl/oferta/{it.get('id')}",
                 title=it.get("title", ""), development=dev, seller=(ag.get("name") if isinstance(ag, dict) else None),
                 area_m2=area, price_pln=price, price_m2=pm2, rooms=_rooms(it.get("roomsNumber")),
-                lat=lat, lon=lon, location_text=full)
+                lat=lat, lon=lon, location_text=full, raw=raw)
 
 
 def _rooms(v) -> int | None:
@@ -146,8 +152,9 @@ def market_stats(db: Session, lat: float, lon: float, r_km: float = 2.0, gone_da
         act = [r for r in rs if r.active]
         gone = [r for r in rs if not r.active]
         b = _bucket(act or rs)
+        units_total = max((int((r.raw or {}).get("investmentUnitsNumber") or 0) for r in rs), default=0) or None
         inv.append({"name": name[:60], "kind": max(("dom", "mieszkanie"), key=lambda k: sum(1 for r in rs if r.kind == k)),
-                    "active": len(act), "gone": len(gone), "pm2_med": b.get("pm2_med"),
+                    "active": len(act), "gone": len(gone), "units_total": units_total, "pm2_med": b.get("pm2_med"),
                     "area_p25": b.get("area_p25"), "area_p75": b.get("area_p75"),
                     "dist_km": round(min(_dist_km(lat, lon, r.lat, r.lon) for r in rs), 1)})
     inv.sort(key=lambda x: (-(x["active"] + x["gone"]), x["dist_km"]))

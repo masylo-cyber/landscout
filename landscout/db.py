@@ -112,6 +112,7 @@ class Comp(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     gone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))   # zniknęła z portalu (≈ sprzedana)
     price_history: Mapped[list] = mapped_column(JSON, default=list)
+    raw: Mapped[dict] = mapped_column(JSON, default=dict)     # m.in. investmentUnitsNumber, investmentState, priceFrom
 
 
 class KV(Base):

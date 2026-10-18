@@ -50,7 +50,7 @@ budowa {{ "{:,.0f}".format(pf.build).replace(',',' ') }} · miękkie {{ "{:,.0f}
 {% endif %}{% endfor %}
 </table>
 {% if r.market.plots_gone %}<div class="meta">Działki wycofane z portali ({{ r.market.gone_days }} d): {{ r.market.plots_gone.n }}, cena ofertowa {{ r.market.plots_gone.pm2_min }}–<b>{{ r.market.plots_gone.pm2_med }}</b>–{{ r.market.plots_gone.pm2_max }} zł/m²</div>{% endif %}
-{% if r.market.investments %}<div class="meta"><b>Inwestycje w toku:</b>{% for i in r.market.investments %}<br>• {{ i.name }} – {{ i.kind }}, {{ i.dist_km }} km, {{ i.active }} akt. / {{ i.gone }} zniknęło{% if i.pm2_med %}, {{ i.pm2_med }} zł/m², {{ i.area_p25 }}–{{ i.area_p75 }} m²{% endif %}{% endfor %}</div>{% endif %}
+{% if r.market.investments %}<div class="meta"><b>Inwestycje w toku:</b>{% for i in r.market.investments %}<br>• {{ i.name }} – {{ i.kind }}, {{ i.dist_km }} km, {{ i.active }} akt. / {{ i.gone }} zniknęło{% if i.units_total %} / {{ i.units_total }} łącznie wg ogłoszenia{% endif %}{% if i.pm2_med %}, {{ i.pm2_med }} zł/m², {{ i.area_p25 }}–{{ i.area_p75 }} m²{% endif %}{% endfor %}</div>{% endif %}
 <div class="meta">Ceny transakcyjne (RCN) – płatne per powiat; do podpięcia po decyzji.</div>
 {% endif %}
 

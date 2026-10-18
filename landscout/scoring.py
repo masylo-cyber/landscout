@@ -18,7 +18,7 @@ RURAL = re.compile(r"\brolna\b|\brolne\b|siedlisk|\bRM\b|\bR\d|\bZL\b|leśn|\bLs
 NUISANCE = re.compile(r"\bS7\b|\bS2\b|\bS8\b|\bA2\b|przy trasie|przy drodze krajowej|linia (?:WN|wysokiego)|tory|kolej|lotnisk|oczyszczal|składowisk", re.I)
 
 
-NON_RESIDENTIAL = re.compile(r"usługow|przemysł|produkcyj|magazynow|logistyc|handlow|komercyjn|\bU\b|\bP/U\b|\bPU\b", re.I)
+NON_RESIDENTIAL = re.compile(r"usługow|us[łl]ugi\b|przemysł|produkcyj|magazynow|logistyc|handlow|komercyjn|\bU\b|\bP/U\b|\bPU\b|\bU/MN\b|\bMN/U\b", re.I)
 RESIDENTIAL = re.compile(r"\bMN|mieszkan|jednorodzinn|bli[źz]niak|szereg|\bdom", re.I)
 
 
@@ -26,9 +26,12 @@ def non_residential(row: Listing) -> bool:
     text = f"{row.title} {row.description}"
     syms = " ".join((row.mpzp or {}).get("symbols") or [])
     zon = (row.analysis or {}).get("zoning_symbol") or ""
-    if re.search(r"\bMN", syms) or zon.upper().startswith("MN"):
+    if (re.search(r"\bMN\b", syms) or zon.upper() == "MN") and not NON_RESIDENTIAL.search(row.title):
         return False
-    return bool(NON_RESIDENTIAL.search(row.title) or NON_RESIDENTIAL.search(zon)) and not RESIDENTIAL.search(text)
+    # tytuł decyduje: "pod usługi", "usługowo-mieszkaniowa" => nie dla domów jednorodzinnych (kandydat MW/U)
+    if NON_RESIDENTIAL.search(row.title):
+        return True
+    return bool(NON_RESIDENTIAL.search(zon)) and not RESIDENTIAL.search(text)
 
 
 # zabudowa ekstensywna / rezydencjonalna / wolnostojąca – segmenty wykluczone
@@ -239,7 +242,8 @@ def score_bauro(row: Listing) -> tuple[float, str]:
     return round(score, 1), verdict
 
 
-MW_EVIDENCE = re.compile(r"\bMW\b|MW/U|U/MW|\bMWU\b|wielorodzinn|pod (?:blok|kamienic|apartamentow)|zabudow\w* mieszkaniow\w* wielorodzinn", re.I)
+MW_EVIDENCE = re.compile(r"\bMW\w*\b|MW/U|U/MW|\bMN/U\b|\bU/MN\b|wielorodzinn|pod (?:blok|kamienic|apartamentow)|us[łl]ugowo[- ]mieszkaniow|"
+                         r"mieszkaniowo[- ]us[łl]ugow|zabudow\w* mieszkaniow\w* wielorodzinn|\bPUM\b|intensywno[śs][ćc]", re.I)
 
 
 def score_mw(row: Listing) -> tuple[float, str]:
@@ -253,7 +257,7 @@ def score_mw(row: Listing) -> tuple[float, str]:
     if row.area_m2 and row.area_m2 < prof["min_area_m2"]:
         return 5.0, "reject"
     syms = " ".join((row.mpzp or {}).get("symbols") or []) + " " + (a.get("zoning_symbol") or "")
-    evidence = bool(MW_EVIDENCE.search(text) or MW_EVIDENCE.search(syms) or a.get("mw_possible"))
+    evidence = bool(MW_EVIDENCE.search(text) or MW_EVIDENCE.search(syms) or a.get("mw_possible") or (a.get("mw_fit") or 0) >= 60)
     if not evidence:
         return 10.0, "reject"
     if _excluded(text, prof["exclude_keywords"]):

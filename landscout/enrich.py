@@ -171,9 +171,12 @@ def _area_hits(a: Area, lat: float, lon: float, parcel: dict | None, location_te
             r = _norm(r)
             return bool(r) and (region.startswith(r) or any(lp == r or lp.startswith(r + " ") for lp in loc_parts))
         if any(hit(r) for r in a.regions):
-            # dla stref warszawskich wymagamy też, by gmina była Warszawa (jeśli znana)
-            if a.district and commune and "warszawa" not in commune:
-                return False
+            # gmina z ewidencji (jeśli znana) musi zgadzać się z obszarem – tekst ogłoszenia sam nie wystarcza
+            if commune:
+                if a.district and "warszawa" not in commune:
+                    return False
+                if a.commune and _norm(a.commune) != commune:
+                    return False
             return True
         if a.strict:
             return False

@@ -92,8 +92,10 @@ def diag() -> None:
                 print(f"wariant {i} ({params.get('VERSION')}, {params['LAYERS'][:20]}): status={r.status_code} len={len(r.text)} tekst={txt[:160]!r}")
             except Exception as e:  # noqa: BLE001
                 print(f"wariant {i} błąd:", e)
-        print("mpzp_by_xy:", {k: v for k, v in mpzp_by_xy(52.065, 20.962).items() if k != "raw"})
-        print("parcel_by_xy:", {k: v for k, v in parcel_by_xy(52.065, 20.962).items() if k != "wkt"})
+        for name, la, lo in (("Magdalenka centrum", 52.0597, 20.9572), ("Łazy", 52.1015, 20.9915), ("Konstancin", 52.0818, 21.1179),
+                             ("Wilanów Zawady", 52.1655, 21.1130), ("Złotokłos", 52.0010, 20.9470)):
+            mp = mpzp_by_xy(la, lo)
+            print(f"mpzp {name}: has_plan={mp.get('has_plan')} gmina={mp.get('gmina')} symbols={mp.get('symbols')} fields={list((mp.get('fields') or {}).items())[:4]}")
 
         print("\n== KOMORNIK ==")
         try:
@@ -115,12 +117,19 @@ def diag() -> None:
                     print("  ścieżki /xxx w pobliżu 'strapi':", sorted(set(re.findall(r'strapi[^;]{0,200}?["`\'](/[a-z][a-z0-9_\-/]{2,40})', js)))[:30])
                 except Exception as e:  # noqa: BLE001
                     print("  skrypt błąd:", e)
-            for probe in ("/api/auctions", "/auctions", "/api/auction-items", "/api/real-estates", "/api/nieruchomosci",
-                          "/api/announcements", "/api/listings", "/api/offers", "/api/estates", "/api/properties"):
+            links = sorted(set(re.findall(r'href="(/[^"#?]{3,80})"', html)))
+            print("linki wewnętrzne:", links[:40])
+            cand = [l for l in links if re.search(r"nieruchom|licytac|obwieszcz|szukaj|wyszuk|lista|items", l, re.I)][:3] or links[:2]
+            for l in cand:
                 try:
-                    r2 = c.get("https://elicytacje-strapi.komornik.pl" + probe)
-                    print(f"  probe {probe}: {r2.status_code} {r2.text[:120]!r}")
+                    r2 = c.get("https://licytacje.komornik.pl" + l)
+                    h2 = r2.text
+                    nd = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', h2, re.S)
+                    api = sorted(set(re.findall(r'https?://[a-z0-9.-]*komornik\.pl/[^"\'\s<>]{3,80}', h2)))
+                    print(f"  {l}: status={r2.status_code} len={len(h2)} NUXT_DATA={len(nd.group(1)) if nd else 0} api_urls={api[:10]}")
+                    if nd:
+                        print("   próbka:", nd.group(1)[:600])
                 except Exception as e:  # noqa: BLE001
-                    print("  probe błąd:", probe, e)
+                    print("  błąd", l, e)
         except Exception as e:  # noqa: BLE001
             print("błąd:", e)

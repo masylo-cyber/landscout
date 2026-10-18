@@ -115,8 +115,9 @@ class OtodomCollector(Collector):
             if fn and not fn.lower().startswith("ul.") and len(fn) > len(full):
                 full = fn
         if full:
-            street = next((pt for pt in parts if pt.lower().startswith("ul.") or pt == (addr.get("street") or {}).get("name") if isinstance(addr.get("street"), dict) else pt == addr.get("street")), None)
-            parts = ([street] if street else []) + [full]
+            st = addr.get("street")
+            street_name = (st.get("name") if isinstance(st, dict) else st) or ""
+            parts = ([street_name] if street_name and street_name.lower() not in full.lower() else []) + [full]
         coords = loc.get("coordinates") or {}
         price = None
         tp = it.get("totalPrice")

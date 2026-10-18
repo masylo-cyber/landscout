@@ -259,8 +259,15 @@ def score_mw(row: Listing) -> tuple[float, str]:
     if _excluded(text, prof["exclude_keywords"]):
         return 10.0, "reject"
     score = 45.0 + min(_kw(text, prof["boost_keywords"]), 5) * 4
-    if row.area_m2:
-        score += 10 if row.area_m2 >= 3000 else 5
+    from .proforma import estimate_pum
+    pum, _, _ = estimate_pum(row, "mw")
+    max_pum = float(prof.get("max_pum_m2", 2500))
+    if pum > max_pum * 1.5:
+        return 20.0, "review"          # za duży projekt
+    if pum > max_pum:
+        score -= 10
+    elif 800 <= pum <= max_pum:
+        score += 10
     if a.get("mw_fit") is not None:
         score = 0.6 * score + 0.4 * float(a["mw_fit"])
     if NUISANCE.search(text):

@@ -1,0 +1,33 @@
+# Dwa profile scoringu. Scoring = reguły + analiza modelu. Wartości do strojenia.
+
+galano:
+  label: "Galano – bliźniaki / szeregi / domy"
+  # minimalna powierzchnia działki na JEDEN segment (m²) wg typu zabudowy,
+  # używana gdy nie udało się odczytać minimum z MPZP
+  m2_per_segment:
+    szereg: 280
+    blizniak: 450
+    wolnostojacy: 800
+  # współczynnik "straty" na drogi wewnętrzne / nieregularny kształt
+  usable_factor: 0.85
+  # próg liczby segmentów, od którego oferta dostaje ALERT (poniżej -> "do przeglądu")
+  min_segments_by_ring:
+    warszawa: 2
+    pierscien: 3
+    dalej: 4
+  min_area_m2: 700
+  max_price_pln: 15000000
+  # słowa wykluczające (rolne bez planu, lasy, usługowe)
+  exclude_keywords: ["rolna bez", "działka leśna", "grunt leśny", "usługowa", "przemysł", "siedliskowa", "rekreacyjna"]
+  # słowa kluczowe zwiększające wynik
+  boost_keywords: ["MN", "bliźniacz", "szeregow", "pod zabudowę", "warunki zabudowy", "mpzp", "media", "podział", "deweloper"]
+
+bauro:
+  label: "BAURO – działki pod domy premium"
+  min_area_m2: 1000
+  preferred_area_m2: [1500, 4000]
+  max_price_pln: 12000000
+  exclude_keywords: ["rolna bez", "usługowa", "przemysł", "przy trasie", "S7", "S2", "linia kolejowa"]
+  boost_keywords: ["las", "leśna", "zieleń", "cisza", "prestiż", "rezydenc", "willowa", "stary drzewostan", "MN", "mpzp"]
+  # minimalny wynik (0-100) na alert
+  alert_score: 65

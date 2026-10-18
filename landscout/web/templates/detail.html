@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ r.title }} – LandScout{% endblock %}
+{% block body %}
+<p><a href="javascript:history.back()">← wróć</a></p>
+<h2 style="margin:4px 0">{{ r.title }}</h2>
+<div class="meta">
+  {% if r.price_pln %}{{ "{:,.0f}".format(r.price_pln).replace(',',' ') }} zł{% endif %}
+  {% if r.area_m2 %} · {{ "{:,.0f}".format(r.area_m2).replace(',',' ') }} m²{% endif %}
+  · {{ r.location_text }} {% if r.area_name %}({{ r.area_name }}, {{ r.ring }}){% endif %} · {{ r.source }}
+  · <a href="{{ r.url }}" target="_blank">oferta ↗</a>
+  {% if r.lat %} · <a href="https://maps.google.com/?q={{ r.lat }},{{ r.lon }}" target="_blank">mapa ↗</a>
+  · <a href="https://mapy.geoportal.gov.pl/imap/Imgp_2.html?locale=pl&gui=new&sessionID=&actions=acShowWgPlot_{{ r.parcel_id or '' }}" target="_blank">geoportal ↗</a>{% endif %}
+</div>
+
+<div style="display:flex;gap:16px;margin:12px 0;flex-wrap:wrap">
+  <div class="row" style="flex:1;min-width:260px;grid-template-columns:1fr">
+    <div><b>Galano</b> <span class="badge {{ r.verdict_galano }}">{{ r.verdict_galano }}</span> wynik {{ r.score_galano|int if r.score_galano is not none else '–' }} · szac. segmentów: <b>{{ r.segments_est or '–' }}</b></div>
+    <div><b>BAURO</b> <span class="badge {{ r.verdict_bauro }}">{{ r.verdict_bauro }}</span> wynik {{ r.score_bauro|int if r.score_bauro is not none else '–' }}</div>
+  </div>
+  <form class="row inline" method="post" action="/l/{{ r.id }}/status" style="flex:1;min-width:260px;grid-template-columns:1fr">
+    <input type="hidden" name="back" value="/l/{{ r.id }}">
+    <select name="status_v">{% for s in STATUSES %}<option value="{{ s }}" {{ 'selected' if r.status==s }}>{{ STATUS_PL[s] }}</option>{% endfor %}</select>
+    <textarea name="note" rows="3" placeholder="notatka (telefon, ustalenia, cena po negocjacji)">{{ r.note }}</textarea>
+    <button>Zapisz</button>
+  </form>
+</div>
+
+{% if r.analysis %}
+<h3>Analiza</h3>
+<p>{{ r.analysis.summary_pl }}</p>
+<div class="meta">
+  MPZP: {{ r.analysis.zoning_symbol or '–' }} · WZ: {{ r.analysis.has_wz }} · dojazd: {{ r.analysis.road_access or '–' }} ·
+  podział: {{ r.analysis.divisible }} · typy: {{ r.analysis.allowed_types|join(', ') if r.analysis.allowed_types else '–' }} ·
+  media: {{ r.analysis.utilities }}
+</div>
+{% if r.analysis.risks %}<p>⚠️ {{ r.analysis.risks|join(' · ') }}</p>{% endif %}
+{% endif %}
+
+{% if r.images %}<div style="display:flex;gap:8px;overflow-x:auto;margin:10px 0">{% for im in r.images %}<img src="{{ im }}" style="height:180px;border-radius:8px">{% endfor %}</div>{% endif %}
+
+<h3>Rejestry</h3>
+<div class="meta">Działka: {{ r.parcel_id or 'brak' }}
+{% if r.parcel %} · obręb {{ r.parcel.region }} · {{ r.parcel.commune }} · pow. geom. {{ r.parcel.area_m2_geom }} m² · front/głębokość ~{{ r.parcel.width_m }}/{{ r.parcel.depth_m }} m · zwartość {{ r.parcel.compactness }}{% endif %}</div>
+{% if r.mpzp %}<div class="meta">MPZP (KIMPZP): {% if r.mpzp.has_plan %}jest{% if r.mpzp.symbols %} · symbole w opisie: {{ r.mpzp.symbols|join(', ') }}{% endif %}
+{% for k,v in (r.mpzp.fields or {}).items() %} · {{ k }}: {{ v }}{% endfor %}
+{% for l in r.mpzp.links or [] %} · <a href="{{ l }}" target="_blank">dokument ↗</a>{% endfor %}{% else %}brak planu w rejestrze krajowym (wymaga WZ lub plan nieopublikowany){% endif %}</div>{% endif %}
+
+{% if dups %}<h3>Ta sama nieruchomość w innych źródłach</h3>{% for d in dups %}<div class="meta"><a href="/l/{{ d.id }}">{{ d.source }}: {{ d.title }}</a> {% if d.price_pln %}– {{ "{:,.0f}".format(d.price_pln).replace(',',' ') }} zł{% endif %}</div>{% endfor %}{% endif %}
+
+{% if r.price_history and r.price_history|length > 1 %}<h3>Historia ceny</h3>{% for h in r.price_history %}<div class="meta">{{ h.t[:10] }}: {{ "{:,.0f}".format(h.p).replace(',',' ') }} zł</div>{% endfor %}{% endif %}
+
+<h3>Opis</h3>
+<pre>{{ r.description }}</pre>
+{% endblock %}

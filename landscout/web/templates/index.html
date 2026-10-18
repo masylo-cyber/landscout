@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block body %}
+<form class="filters" method="get">
+  <input type="hidden" name="profile" value="{{ profile }}">
+  <select name="verdict">
+    <option value="alert,review" {{ 'selected' if verdict=='alert,review' }}>alerty + do przeglądu</option>
+    <option value="alert" {{ 'selected' if verdict=='alert' }}>tylko alerty</option>
+    <option value="review" {{ 'selected' if verdict=='review' }}>do przeglądu</option>
+    <option value="" {{ 'selected' if verdict=='' }}>wszystkie (z odrzuconymi)</option>
+  </select>
+  <select name="status_f">
+    <option value="">dowolny status</option>
+    {% for s in STATUSES %}<option value="{{ s }}" {{ 'selected' if status_f==s }}>{{ STATUS_PL[s] }}</option>{% endfor %}
+  </select>
+  <input name="q" value="{{ q }}" placeholder="szukaj: miejscowość, tytuł">
+  <button>Filtruj</button>
+  <span class="meta">{{ total }} ofert</span>
+</form>
+
+{% for r in rows %}
+{% set sc = r.score_galano if profile=='galano' else r.score_bauro %}
+{% set vd = r.verdict_galano if profile=='galano' else r.verdict_bauro %}
+<div class="row">
+  <a href="/l/{{ r.id }}">{% if r.images %}<img src="{{ r.images[0] }}" loading="lazy">{% else %}<div style="width:120px;height:90px;background:var(--line);border-radius:8px"></div>{% endif %}</a>
+  <div>
+    <h3><a href="/l/{{ r.id }}">{{ r.title }}</a></h3>
+    <div class="meta">
+      {% if r.price_pln %}{{ "{:,.0f}".format(r.price_pln).replace(',',' ') }} zł{% endif %}
+      {% if r.area_m2 %} · {{ "{:,.0f}".format(r.area_m2).replace(',',' ') }} m²{% endif %}
+      {% if r.price_pln and r.area_m2 %} · {{ "{:,.0f}".format(r.price_pln/r.area_m2).replace(',',' ') }} zł/m²{% endif %}
+      · {{ r.area_name or r.location_text }} · {{ r.source }} · {{ r.first_seen.strftime('%d.%m') }}
+    </div>
+    <div style="margin-top:4px">
+      <span class="badge {{ vd }}">{{ vd }}</span>
+      {% if profile=='galano' and r.segments_est %}<span class="badge">{{ r.segments_est }} segm.</span>{% endif %}
+      {% if r.kind=='dom_rozbiorka' %}<span class="badge">dom do rozbiórki</span>{% endif %}
+      {% if r.mpzp and r.mpzp.symbols %}<span class="badge">MPZP: {{ r.mpzp.symbols|join(', ') }}</span>{% elif r.analysis and r.analysis.zoning_symbol %}<span class="badge">{{ r.analysis.zoning_symbol }}</span>{% endif %}
+      <span class="badge">{{ STATUS_PL[r.status] }}</span>
+    </div>
+    {% if r.analysis and r.analysis.summary_pl %}<div class="sum">{{ r.analysis.summary_pl }}</div>{% endif %}
+  </div>
+  <div class="side">
+    <div class="score">{{ sc|int if sc is not none else '–' }}</div>
+    <form class="inline" method="post" action="/l/{{ r.id }}/status" style="justify-content:flex-end">
+      <input type="hidden" name="back" value="{{ request.url }}">
+      <select name="status_v" onchange="this.form.submit()">
+        {% for s in STATUSES %}<option value="{{ s }}" {{ 'selected' if r.status==s }}>{{ STATUS_PL[s] }}</option>{% endfor %}
+      </select>
+    </form>
+    <div class="meta" style="margin-top:6px"><a href="{{ r.url }}" target="_blank">otwórz ofertę ↗</a></div>
+  </div>
+</div>
+{% else %}
+<p class="meta">Brak ofert spełniających filtr. Po pierwszym przebiegu (landscout run) pojawią się tutaj.</p>
+{% endfor %}
+
+{% if total > 50 %}<p class="meta">strona {{ page }} ·
+{% if page > 1 %}<a href="?profile={{ profile }}&verdict={{ verdict }}&status_f={{ status_f }}&q={{ q }}&page={{ page-1 }}">← poprzednia</a>{% endif %}
+{% if page*50 < total %} <a href="?profile={{ profile }}&verdict={{ verdict }}&status_f={{ status_f }}&q={{ q }}&page={{ page+1 }}">następna →</a>{% endif %}</p>{% endif %}
+
+<div class="runs">Ostatnie przebiegi:
+{% for ru in runs %}<div>{{ ru.started.strftime('%d.%m %H:%M') }} – {{ ru.stats }} {% if ru.errors %}· błędy: {{ ru.errors|length }}{% endif %}</div>{% endfor %}
+</div>
+{% endblock %}

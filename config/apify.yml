@@ -1,0 +1,20 @@
+# Kolektory Apify – uzupełniane w etapie 2 (Gratka, Morizon, Domiporta, FB Marketplace/grupy).
+# Każdy wpis: name, actor (ID aktora z Apify Store), input, map (mapowanie pól), enabled.
+# Przykład (wyłączony) – włącz po dobraniu aktora i sprawdzeniu pól w Apify:
+#
+# - name: gratka
+#   enabled: false
+#   actor: "apify/web-scraper"
+#   input:
+#     startUrls:
+#       - url: "https://gratka.pl/nieruchomosci/dzialki/mazowieckie/powiat-piaseczynski?powierzchnia-dzialki-w-m2:min=600"
+#   map:
+#     external_id: url
+#     url: url
+#     title: title
+#     description: description
+#     price: price
+#     area: area
+#     location: location
+#     images: images
+[]

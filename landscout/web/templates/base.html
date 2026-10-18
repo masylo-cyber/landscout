@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}LandScout{% endblock %}</title>
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--ink:#1d1d1b;--mute:#6b6b66;--line:#e4e2db;--g:#2f6f4e;--b:#6b4b2a;--warn:#b5651d;--bad:#a33}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--card:#1f1f1c;--ink:#ecebe6;--mute:#9b9a92;--line:#2d2d29}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;gap:16px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
+header h1{font-size:18px;margin:0 12px 0 0}header a{color:var(--ink);text-decoration:none;padding:6px 10px;border-radius:8px;border:1px solid var(--line)}
+header a.on{background:var(--ink);color:var(--bg)}
+main{padding:16px 20px;max-width:1200px;margin:0 auto}
+.row{display:grid;grid-template-columns:120px 1fr 190px;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.row img{width:120px;height:90px;object-fit:cover;border-radius:8px;background:var(--line)}
+.row h3{margin:0 0 4px;font-size:16px}.row h3 a{color:var(--ink);text-decoration:none}
+.meta{color:var(--mute);font-size:13px}.sum{margin-top:6px;font-size:14px}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line);margin-right:4px}
+.alert{background:var(--g);color:#fff;border-color:var(--g)}.review{background:var(--warn);color:#fff;border-color:var(--warn)}.reject{color:var(--mute)}
+.score{font-size:28px;font-weight:700}.side{text-align:right}
+form.inline{display:flex;gap:6px;flex-wrap:wrap;align-items:center}select,input,button,textarea{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+button{cursor:pointer}.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.runs{font-size:12px;color:var(--mute);margin-top:20px}pre{white-space:pre-wrap;font-size:13px;background:var(--card);border:1px solid var(--line);padding:10px;border-radius:8px}
+@media(max-width:700px){.row{grid-template-columns:1fr}.row img{width:100%;height:160px}.side{text-align:left}}
+</style>
+</head>
+<body>
+<header>
+  <h1>LandScout</h1>
+  <a href="/?profile=galano" class="{{ 'on' if profile=='galano' else '' }}">Galano {% if counts %}({{ counts.galano }}){% endif %}</a>
+  <a href="/?profile=bauro" class="{{ 'on' if profile=='bauro' else '' }}">BAURO {% if counts %}({{ counts.bauro }}){% endif %}</a>
+</header>
+<main>{% block body %}{% endblock %}</main>
+</body></html>

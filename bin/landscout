@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Wrapper na serwerze: zarządzanie LandScout bez wchodzenia w Dockera.
+set -euo pipefail
+DIR="/opt/landscout"
+cd "$DIR"
+
+case "${1:-help}" in
+  status)  docker compose ps ;;
+  logs)    docker compose logs -f --tail=200 "${2:-scheduler}" ;;
+  run)     docker compose run --rm scheduler landscout run "${@:2}" ;;
+  update)
+    git pull --ff-only
+    docker compose up -d --build
+    echo "Zaktualizowano do $(git rev-parse --short HEAD)" ;;
+  restart) docker compose restart ;;
+  stop)    docker compose down ;;
+  telegram-setup) docker compose run --rm scheduler landscout telegram-setup ;;
+  test-alert)     docker compose run --rm scheduler landscout test-alert "${@:2}" ;;
+  shell)   docker compose run --rm scheduler bash ;;
+  db)      docker compose exec db psql -U landscout landscout ;;
+  panel)
+    IP="$(curl -4fsS https://ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+    cat <<EOF
+Panel słucha tylko lokalnie (127.0.0.1:8080). Na swoim komputerze uruchom tunel:
+  ssh -N -L 8080:127.0.0.1:8080 root@$IP
+i otwórz http://localhost:8080  (login: patrz PANEL_USER/PANEL_PASSWORD w $DIR/.env)
+Żeby wystawić panel publicznie z HTTPS, powiedz Claude'owi — dołoży Caddy + domenę.
+EOF
+    ;;
+  *)
+    cat <<EOF
+landscout status | logs [app|scheduler|db] | run [--source X] | update | restart | stop
+landscout telegram-setup | test-alert [galano|bauro] | shell | db | panel
+EOF
+    ;;
+esac

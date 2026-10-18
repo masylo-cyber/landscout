@@ -127,8 +127,8 @@ def analyze(row: Listing) -> dict:
         cl = anthropic.Anthropic(api_key=s.anthropic_api_key, timeout=120, max_retries=2)
         msg = cl.messages.create(
             model=s.claude_model, max_tokens=1500, system=SYSTEM,
-            tools=[TOOL], tool_choice={"type": "tool", "name": "ocena_oferty"},
-            messages=[{"role": "user", "content": f"Oferta (JSON):\n{_payload(row)}\n\nOpis pól (schemat):\n{SCHEMA}"}],
+            tools=[TOOL], tool_choice={"type": "auto"},
+            messages=[{"role": "user", "content": f"Oferta (JSON):\n{_payload(row)}\n\nUżyj narzędzia ocena_oferty. Opis pól (schemat):\n{SCHEMA}"}],
         )
         data = None
         for b in msg.content:

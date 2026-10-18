@@ -113,11 +113,20 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
     return stats
 
 
-def rescore(refresh_mpzp: bool = False, llm_missing: int = 0) -> dict:
+def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = False) -> dict:
     """Przelicza scoring wszystkich wzbogaconych ofert (po zmianie reguł) bez ponownego pobierania."""
     init_db()
-    n = n_mpzp = n_llm = 0
+    n = n_mpzp = n_llm = n_geo = 0
     with session() as db:
+        if regeocode:
+            # oferty bez trafienia w obszar i z lokalizacją bez miejscowości (sama ulica) -> do ponownego wzbogacenia
+            for row in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.area_name.is_(None))):
+                if "," not in (row.location_text or "") or not row.lat:
+                    row.lat = row.lon = None
+                    row.parcel, row.mpzp, row.parcel_id = {}, {}, None
+                    row.enriched_at = None
+                    n_geo += 1
+            db.commit()
         for row in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.enriched_at.isnot(None))):
             if refresh_mpzp and row.lat and row.lon and not (row.mpzp or {}).get("has_plan"):
                 mp = mpzp_by_xy(row.lat, row.lon)
@@ -134,8 +143,8 @@ def rescore(refresh_mpzp: bool = False, llm_missing: int = 0) -> dict:
             if n % 50 == 0:
                 db.commit()
         db.commit()
-    log.info("rescore: %d ofert, mpzp odświeżone: %d, analiz LLM: %d", n, n_mpzp, n_llm)
-    return {"rescored": n, "mpzp_refreshed": n_mpzp, "analyzed": n_llm}
+    log.info("rescore: %d ofert, mpzp odświeżone: %d, analiz LLM: %d, do ponownego geokodowania: %d", n, n_mpzp, n_llm, n_geo)
+    return {"rescored": n, "mpzp_refreshed": n_mpzp, "analyzed": n_llm, "regeocode_queued": n_geo}
 
 
 def loop() -> None:

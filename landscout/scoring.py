@@ -18,6 +18,19 @@ RURAL = re.compile(r"\brolna\b|\brolne\b|siedlisk|\bRM\b|\bR\d|\bZL\b|leśn|\bLs
 NUISANCE = re.compile(r"\bS7\b|\bS2\b|\bS8\b|\bA2\b|przy trasie|przy drodze krajowej|linia (?:WN|wysokiego)|tory|kolej|lotnisk|oczyszczal|składowisk", re.I)
 
 
+NON_RESIDENTIAL = re.compile(r"usługow|przemysł|produkcyj|magazynow|logistyc|handlow|komercyjn|\bU\b|\bP/U\b|\bPU\b", re.I)
+RESIDENTIAL = re.compile(r"\bMN|mieszkan|jednorodzinn|bli[źz]niak|szereg|\bdom", re.I)
+
+
+def non_residential(row: Listing) -> bool:
+    text = f"{row.title} {row.description}"
+    syms = " ".join((row.mpzp or {}).get("symbols") or [])
+    zon = (row.analysis or {}).get("zoning_symbol") or ""
+    if re.search(r"\bMN", syms) or zon.upper().startswith("MN"):
+        return False
+    return bool(NON_RESIDENTIAL.search(row.title) or NON_RESIDENTIAL.search(zon)) and not RESIDENTIAL.search(text)
+
+
 def build_evidence(row: Listing) -> bool:
     a = row.analysis or {}
     mp = row.mpzp or {}
@@ -96,6 +109,8 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
     need = prof["min_segments_by_ring"].get(ring, prof["min_segments_by_ring"]["dalej"])
     evidence = build_evidence(row)
     rural = is_rural(row)
+    if non_residential(row):
+        return 10.0, "reject", 0
     if rural and not evidence:
         n = min(n, 2)   # bez planu/WZ nie liczymy segmentów z czystej powierzchni
 
@@ -150,6 +165,8 @@ def score_bauro(row: Listing) -> tuple[float, str]:
 
     rural = is_rural(row)
     evidence = build_evidence(row)
+    if non_residential(row):
+        return 10.0, "reject"
     score = 30.0
     if rural:
         score -= 15

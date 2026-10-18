@@ -66,6 +66,14 @@ def upsert(s: Session, o: RawOffer) -> tuple[Listing, bool]:
         row.kind = classify(row.title, row.description, row.raw)
     if o.area_m2 and not row.area_m2:
         row.area_m2 = o.area_m2
+    # lepsza lokalizacja (np. dopisana miejscowość) -> ponowne geokodowanie i wzbogacenie
+    if o.location_text and len(o.location_text) > len(row.location_text or "") + 3:
+        row.location_text = o.location_text[:500]
+        if not o.lat:
+            row.lat = row.lon = None
+            row.parcel, row.mpzp, row.parcel_id = {}, {}, None
+            row.enriched_at = None
+            row.area_name = row.ring = None
     if o.lat and not row.lat:
         row.lat, row.lon = o.lat, o.lon
     if not row.cluster_key:

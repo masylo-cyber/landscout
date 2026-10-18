@@ -7,6 +7,7 @@ import sys
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # nie loguj URL-i z tokenami
     p = argparse.ArgumentParser(prog="landscout")
     sub = p.add_subparsers(dest="cmd", required=True)
 

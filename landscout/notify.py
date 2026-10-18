@@ -121,12 +121,18 @@ def discover_chat_ids() -> dict[str, str]:
     try:
         with httpx.Client(timeout=30) as c:
             r = c.get(TG.format(token=s.telegram_bot_token, method="getUpdates"))
-            for upd in r.json().get("result", []):
+            js = r.json()
+            if not js.get("ok"):
+                log.warning("getUpdates: %s", js.get("description"))
+            updates = js.get("result", [])
+            log.info("getUpdates: %d wiadomości", len(updates))
+            for upd in updates:
                 m = upd.get("message") or upd.get("channel_post") or {}
-                txt = (m.get("text") or "").strip().lower()
+                txt = (m.get("text") or m.get("caption") or "").strip().lower()
                 chat = str((m.get("chat") or {}).get("id", ""))
                 if not chat:
                     continue
+                log.info("  od chat %s: %r", chat, txt[:40])
                 if "/start" in txt:
                     for p in ("galano", "bauro"):
                         if p in txt:

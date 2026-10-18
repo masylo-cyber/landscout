@@ -85,7 +85,15 @@ def analyze(row: Listing) -> dict:
         if text.startswith("```"):
             text = text.strip("`")
             text = text[text.find("{"):]
-        data = json.loads(text[text.find("{"): text.rfind("}") + 1])
+        raw = text[text.find("{"): text.rfind("}") + 1]
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            import re as _re
+            cleaned = _re.sub(r",\s*([}\]])", r"\1", raw)          # przecinki końcowe
+            cleaned = _re.sub(r"//[^\n]*", "", cleaned)             # komentarze
+            cleaned = cleaned.replace("true/false", "null").replace("number|null", "null")
+            data = json.loads(cleaned)
         data["_model"] = s.claude_model
         row.analysis = data
         row.analyzed_at = datetime.now(timezone.utc)

@@ -70,6 +70,54 @@ def _payload(row: Listing) -> str:
     }, ensure_ascii=False)
 
 
+_NUM = {"type": ["number", "null"]}
+_BOOL = {"type": ["boolean", "null"]}
+_STR = {"type": ["string", "null"]}
+TOOL = {
+    "name": "ocena_oferty",
+    "description": "Zapisz ustrukturyzowaną ocenę oferty.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "kind": {"type": "string", "enum": ["dzialka", "dom_rozbiorka", "dom", "inne"]},
+            "is_development_land": {"type": "boolean"},
+            "plot_area_m2": _NUM, "frontage_m": _NUM, "zoning_symbol": _STR,
+            "has_mpzp": _BOOL, "has_wz": _BOOL,
+            "allowed_types": {"type": "array", "items": {"type": "string", "enum": ["wolnostojacy", "blizniak", "szeregowy"]}},
+            "min_plot_per_unit_m2_from_text": _NUM,
+            "mpzp_params": {"type": ["object", "null"], "properties": {
+                "floor_area_ratio": _NUM, "max_coverage_pct": _NUM, "max_floors": _NUM, "max_height_m": _NUM,
+                "min_plot_per_unit_m2": _NUM, "min_plot_m2": _NUM, "min_bio_pct": _NUM, "source": _STR}},
+            "utilities": {"type": ["object", "null"], "properties": {"water": _BOOL, "sewage": _BOOL, "gas": _BOOL, "power": _BOOL}},
+            "road_access": _STR, "divisible": _BOOL, "forest_or_green_nearby": _BOOL,
+            "nuisances": {"type": "array", "items": {"type": "string"}},
+            "seller": _STR, "price_negotiable_hint": _BOOL,
+            "galano_segments_estimate": _NUM, "galano_fit": {"type": "number"}, "bauro_fit": {"type": "number"},
+            "mw_possible": _BOOL, "mw_fit": {"type": "number"},
+            "risks": {"type": "array", "items": {"type": "string"}},
+            "summary_pl": {"type": "string"},
+        },
+        "required": ["kind", "is_development_land", "allowed_types", "galano_fit", "bauro_fit", "mw_fit", "risks", "summary_pl"],
+    },
+}
+
+
+def _parse_text(text: str) -> dict:
+    """Awaryjne parsowanie, gdy model odpowie tekstem zamiast narzędziem."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        text = text[text.find("{"):]
+    raw = text[text.find("{"): text.rfind("}") + 1]
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        import re as _re
+        cleaned = _re.sub(r",\s*([}\]])", r"\1", raw)
+        cleaned = _re.sub(r"//[^\n]*", "", cleaned)
+        return json.loads(cleaned)
+
+
 def analyze(row: Listing) -> dict:
     s = settings()
     if not s.anthropic_api_key:
@@ -78,22 +126,17 @@ def analyze(row: Listing) -> dict:
         import anthropic
         cl = anthropic.Anthropic(api_key=s.anthropic_api_key)
         msg = cl.messages.create(
-            model=s.claude_model, max_tokens=1200, system=SYSTEM,
-            messages=[{"role": "user", "content": f"Oferta (JSON):\n{_payload(row)}\n\nZwróć JSON wg schematu:\n{SCHEMA}"}],
+            model=s.claude_model, max_tokens=1500, system=SYSTEM,
+            tools=[TOOL], tool_choice={"type": "tool", "name": "ocena_oferty"},
+            messages=[{"role": "user", "content": f"Oferta (JSON):\n{_payload(row)}\n\nOpis pól (schemat):\n{SCHEMA}"}],
         )
-        text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
-        if text.startswith("```"):
-            text = text.strip("`")
-            text = text[text.find("{"):]
-        raw = text[text.find("{"): text.rfind("}") + 1]
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            import re as _re
-            cleaned = _re.sub(r",\s*([}\]])", r"\1", raw)          # przecinki końcowe
-            cleaned = _re.sub(r"//[^\n]*", "", cleaned)             # komentarze
-            cleaned = cleaned.replace("true/false", "null").replace("number|null", "null")
-            data = json.loads(cleaned)
+        data = None
+        for b in msg.content:
+            if getattr(b, "type", "") == "tool_use" and isinstance(b.input, dict):
+                data = b.input
+                break
+        if data is None:
+            data = _parse_text("".join(b.text for b in msg.content if getattr(b, "type", "") == "text"))
         data["_model"] = s.claude_model
         row.analysis = data
         row.analyzed_at = datetime.now(timezone.utc)

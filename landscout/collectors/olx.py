@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Iterable
 
 from ..config import olx_regions
-from .base import Collector, RawOffer, area_from_text, client, get, log, to_float
+from .base import Collector, RawOffer, apify_proxy_url, area_from_text, client, get, log, proxied_client, to_float
 
 BASE = "https://www.olx.pl/nieruchomosci/dzialki/sprzedaz/{region}/"
 PARAMS = "?search%5Bfilter_float_m%3Afrom%5D=600&search%5Border%5D=created_at%3Adesc&page={page}"
@@ -57,7 +57,33 @@ class OlxCollector(Collector):
         self.pages = pages
 
     def collect(self) -> Iterable[RawOffer]:
+        # OLX blokuje IP serwerowe (CloudFront 403) – jeśli jest token Apify, idziemy przez Apify Proxy
+        with client() as probe:
+            try:
+                blocked = probe.get(BASE.format(region="piaseczno")).status_code == 403
+            except Exception:  # noqa: BLE001
+                blocked = True
+        if blocked and apify_proxy_url():
+            log.info("olx: IP zablokowane, używam Apify Proxy")
+            for residential in (True, False):
+                try:
+                    with proxied_client(residential=residential) as c:
+                        if c.get(BASE.format(region="piaseczno")).status_code != 200:
+                            continue
+                        yield from self._collect_with(c)
+                        return
+                except Exception as e:  # noqa: BLE001
+                    log.warning("olx proxy (residential=%s): %s", residential, e)
+            log.warning("olx: proxy też odrzucone – pomijam OLX w tym przebiegu")
+            return
+        if blocked:
+            log.warning("olx: IP zablokowane i brak APIFY_TOKEN – pomijam OLX")
+            return
         with client() as c:
+            yield from self._collect_with(c)
+
+    def _collect_with(self, c) -> Iterable[RawOffer]:
+        if True:
             # 1) API mobilne (często nieblokowane dla IP serwerowych)
             got_api = False
             for region in self.regions:

@@ -32,6 +32,21 @@ def diag() -> None:
         except Exception as e:  # noqa: BLE001
             print("OLX API błąd:", e)
 
+        from .collectors.base import apify_proxy_url, proxied_client
+        if apify_proxy_url():
+            for res in (True, False):
+                try:
+                    with proxied_client(residential=res) as pc:
+                        r = pc.get(OLX_BASE.format(region="piaseczno") + OLX_PARAMS.format(page=1))
+                        st = _state(r.text)
+                        print(f"OLX przez Apify Proxy (residential={res}): status={r.status_code} len={len(r.text)} state={'tak' if st else 'nie'} ads={len(_ads(st)) if st else 0}")
+                        if r.status_code != 200:
+                            print("   ", r.text[:160].replace("\n", " "))
+                except Exception as e:  # noqa: BLE001
+                    print(f"OLX proxy (residential={res}) błąd:", e)
+        else:
+            print("OLX przez Apify Proxy: brak APIFY_TOKEN w .env")
+
         print("\n== OTODOM ==")
         url = OTODOM_URL.format(estate="dzialka", loc="mazowieckie/piaseczynski", extra="areaMin=600", page=1)
         try:
@@ -42,7 +57,7 @@ def diag() -> None:
             print(f"__NEXT_DATA__: {'tak' if '__NEXT_DATA__' in html else 'nie'}; items={len(items)}")
             if "__NEXT_DATA__" in html and not items:
                 import json
-                m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.S)
+                m = re.search(r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
                 try:
                     data = json.loads(m.group(1))
                     pp = data.get("props", {}).get("pageProps", {})
@@ -68,6 +83,22 @@ def diag() -> None:
             print(f"status={r.status_code} len={len(html)} final_url={r.url}")
             print("linki /api i ścieżki:", sorted(set(re.findall(r'["\'](/(?:api|v\d|items|nieruchomosci|obwieszczenia)[^"\'\s<>]{0,80})', html)))[:25])
             print("hosty api:", sorted(set(re.findall(r'https?://[a-z0-9.-]*api[a-z0-9.-]*\.[a-z]+[^"\'\s<>]{0,60}', html)))[:10])
-            print("skrypty:", re.findall(r'src="([^"]+\.js)"', html)[:6])
+            scripts = re.findall(r'src="([^"]+\.js)"', html)[:3]
+            print("skrypty:", scripts)
+            for sc in scripts:
+                try:
+                    js = c.get("https://licytacje.komornik.pl" + sc if sc.startswith("/") else sc).text
+                    paths = sorted(set(re.findall(r'["`\'](/api/[a-zA-Z0-9_\-/]{2,60})', js)))
+                    print(f"  {sc}: len={len(js)} /api/*: {paths[:40]}")
+                    print("  strapi:", sorted(set(re.findall(r'strapi[a-zA-Z0-9_\-./]{0,60}', js)))[:15])
+                except Exception as e:  # noqa: BLE001
+                    print("  skrypt błąd:", e)
+            for probe in ("/api/auctions?pagination[pageSize]=1", "/api/items?pagination[pageSize]=1", "/api/announcements?pagination[pageSize]=1",
+                          "/api/obwieszczenia?pagination[pageSize]=1", "/api/licytacje?pagination[pageSize]=1"):
+                try:
+                    r2 = c.get("https://elicytacje-strapi.komornik.pl" + probe)
+                    print(f"  probe {probe}: {r2.status_code} {r2.text[:120]!r}")
+                except Exception as e:  # noqa: BLE001
+                    print("  probe błąd:", probe, e)
         except Exception as e:  # noqa: BLE001
             print("błąd:", e)

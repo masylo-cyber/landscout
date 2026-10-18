@@ -31,7 +31,7 @@ SEARCHES = [
     ("dom", "description=wyburzenia"),
 ]
 URL = "https://www.otodom.pl/pl/wyniki/sprzedaz/{estate}/{loc}?{extra}&by=LATEST&direction=DESC&limit=72&page={page}"
-NEXT_RE = re.compile(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', re.S)
+NEXT_RE = re.compile(r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>', re.S)
 
 
 def _find_items(node, depth=0) -> list[dict]:

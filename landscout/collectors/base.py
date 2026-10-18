@@ -43,6 +43,22 @@ def client(**kw) -> httpx.Client:
                         timeout=30, follow_redirects=True, **kw)
 
 
+def apify_proxy_url(residential: bool = True) -> str | None:
+    """Apify Proxy – do portali blokujących IP serwerowe (wymaga APIFY_TOKEN)."""
+    import os
+    token = os.environ.get("APIFY_TOKEN", "")
+    if not token:
+        return None
+    user = "groups-RESIDENTIAL,country-PL" if residential else "auto"
+    return f"http://{user}:{token}@proxy.apify.com:8000"
+
+
+def proxied_client(residential: bool = True, **kw) -> httpx.Client:
+    proxy = apify_proxy_url(residential)
+    return httpx.Client(headers={"User-Agent": UA, "Accept-Language": "pl-PL,pl;q=0.9"}, timeout=45,
+                        follow_redirects=True, proxy=proxy, **kw)
+
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=20), reraise=True)
 def get(c: httpx.Client, url: str, **kw) -> httpx.Response:
     r = c.get(url, **kw)

@@ -46,11 +46,12 @@ def client(**kw) -> httpx.Client:
 def apify_proxy_url(residential: bool = True) -> str | None:
     """Apify Proxy – do portali blokujących IP serwerowe (wymaga APIFY_TOKEN)."""
     import os
-    token = os.environ.get("APIFY_TOKEN", "")
-    if not token:
+    # Apify Proxy używa osobnego hasła (Console -> Proxy -> Password), nie tokena API
+    pwd = os.environ.get("APIFY_PROXY_PASSWORD", "")
+    if not pwd:
         return None
     user = "groups-RESIDENTIAL,country-PL" if residential else "auto"
-    return f"http://{user}:{token}@proxy.apify.com:8000"
+    return f"http://{user}:{pwd}@proxy.apify.com:8000"
 
 
 def proxied_client(residential: bool = True, **kw) -> httpx.Client:

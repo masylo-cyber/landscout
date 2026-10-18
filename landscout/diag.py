@@ -45,7 +45,7 @@ def diag() -> None:
                 except Exception as e:  # noqa: BLE001
                     print(f"OLX proxy (residential={res}) błąd:", e)
         else:
-            print("OLX przez Apify Proxy: brak APIFY_TOKEN w .env")
+            print("OLX przez Apify Proxy: brak APIFY_PROXY_PASSWORD w .env (Console -> Proxy -> Password)")
 
         print("\n== OTODOM ==")
         url = OTODOM_URL.format(estate="dzialka", loc="mazowieckie/piaseczynski", extra="areaMin=600", page=1)
@@ -90,11 +90,14 @@ def diag() -> None:
                     js = c.get("https://licytacje.komornik.pl" + sc if sc.startswith("/") else sc).text
                     paths = sorted(set(re.findall(r'["`\'](/api/[a-zA-Z0-9_\-/]{2,60})', js)))
                     print(f"  {sc}: len={len(js)} /api/*: {paths[:40]}")
-                    print("  strapi:", sorted(set(re.findall(r'strapi[a-zA-Z0-9_\-./]{0,60}', js)))[:15])
+                    calls = re.findall(r'strapiFetch\)?\(\s*[`"\']([^`"\']{1,80})', js)
+                    print("  strapiFetch(...):", sorted(set(calls))[:40])
+                    print("  stringi z '?populate'/'filters':", sorted(set(re.findall(r'[`"\']([^`"\']{0,60}(?:populate|filters|pagination)[^`"\']{0,60})', js)))[:20])
+                    print("  ścieżki /xxx w pobliżu 'strapi':", sorted(set(re.findall(r'strapi[^;]{0,200}?["`\'](/[a-z][a-z0-9_\-/]{2,40})', js)))[:30])
                 except Exception as e:  # noqa: BLE001
                     print("  skrypt błąd:", e)
-            for probe in ("/api/auctions?pagination[pageSize]=1", "/api/items?pagination[pageSize]=1", "/api/announcements?pagination[pageSize]=1",
-                          "/api/obwieszczenia?pagination[pageSize]=1", "/api/licytacje?pagination[pageSize]=1"):
+            for probe in ("/api/auctions", "/auctions", "/api/auction-items", "/api/real-estates", "/api/nieruchomosci",
+                          "/api/announcements", "/api/listings", "/api/offers", "/api/estates", "/api/properties"):
                 try:
                     r2 = c.get("https://elicytacje-strapi.komornik.pl" + probe)
                     print(f"  probe {probe}: {r2.status_code} {r2.text[:120]!r}")

@@ -86,6 +86,16 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                 q = select(Listing).where(Listing.active.is_(True), getattr(Listing, flag_col).is_(False),
                                           getattr(Listing, verdict_col) == "alert")
                 for row in db.scalars(q):
+                    if not row.analysis:
+                        # alert dopiero po analizie modelem (MPZP/PUM/marża); bez niej czeka w panelu
+                        if llm_budget > 0 and analyze(row):
+                            llm_budget -= 1
+                            score(row)
+                            db.commit()
+                            if getattr(row, verdict_col) != "alert":
+                                continue
+                        else:
+                            continue
                     ck = f"{prof}:{row.cluster_key}" if row.cluster_key else None
                     if ck and ck in alerted_clusters:
                         setattr(row, flag_col, True)

@@ -10,7 +10,7 @@ from .base import Collector, RawOffer, area_from_text, client, get, log, to_floa
 # powiaty / miasta (slug morizon)
 LOCATIONS = ["piaseczynski", "pruszkowski", "grodziski", "warszawski-zachodni", "grojecki", "otwocki", "minski",
              "legionowski", "warszawa"]
-URL = "https://www.morizon.pl/dzialki/najnowsze/{loc}/?ps%5Bliving_area_from%5D=600&page={page}"
+URL = "https://www.morizon.pl/dzialki/najnowsze/{loc}/?page={page}"
 LD_RE = re.compile(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', re.S)
 
 

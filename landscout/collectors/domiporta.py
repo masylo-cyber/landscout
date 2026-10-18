@@ -52,7 +52,11 @@ class DomiportaCollector(Collector):
         url = href if href.startswith("http") else "https://www.domiporta.pl" + href
         title = a.get_text(" ", strip=True)
         area_el = card.select_one(".sneakpeak__details_item--area")
-        area = area_from_text(area_el.get_text(" ", strip=True) + " m2") if area_el else None
+        area = None
+        if area_el:
+            txt = area_el.get_text(" ", strip=True)          # np. "1 710 m2" / "1,2 ha"
+            txt = re.sub(r"\s*m\s*2\s*$", " m2", txt)
+            area = area_from_text(txt) or to_float(re.sub(r"[^\d,.]", "", txt.split("m")[0]))
         price_el = card.select_one(".sneakpeak__price_value")
         price = to_float(price_el.get_text(" ", strip=True)) if price_el else None
         if price and price < 1000:   # "zapytaj o cenę" itp.

@@ -6,7 +6,7 @@ import re
 
 from .config import profiles
 from .db import Listing
-from .enrich import in_profile_area
+from .enrich import in_profile_area_parcel
 
 RING_DEFAULT = "dalej"
 
@@ -107,7 +107,7 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
     prof = profiles()["galano"]
     text = f"{row.title} {row.description}"
     a = row.analysis or {}
-    if row.lat and row.lon and not in_profile_area(row.lat, row.lon, "galano"):
+    if row.lat and row.lon and not in_profile_area_parcel(row.lat, row.lon, "galano", row.parcel):
         return 0.0, "reject", 0
     if row.kind not in ("dzialka", "dom_rozbiorka", "unknown", "inne") and a.get("kind") not in ("dzialka", "dom_rozbiorka"):
         return 0.0, "reject", 0
@@ -170,7 +170,7 @@ def score_bauro(row: Listing) -> tuple[float, str]:
     prof = profiles()["bauro"]
     text = f"{row.title} {row.description}"
     a = row.analysis or {}
-    if row.lat and row.lon and not in_profile_area(row.lat, row.lon, "bauro"):
+    if row.lat and row.lon and not in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel):
         return 0.0, "reject"
     if row.kind == "dom" and a.get("kind") != "dom_rozbiorka":
         return 0.0, "reject"

@@ -40,5 +40,6 @@ def stats() -> None:
         # obszary bez trafień
         print("\nobszary wg liczby ofert:", dict(Counter(r.area_name for r in enr if r.area_name).most_common(30)))
         print("poza obszarem (przykłady):", [ (r.location_text or r.title)[:30] for r in enr if not r.area_name][:10])
-        n_bauro_area = sum(1 for r in enr if r.lat and r.lon and __import__("landscout.enrich", fromlist=["in_profile_area"]).in_profile_area(r.lat, r.lon, "bauro"))
+        from .enrich import in_profile_area_parcel
+        n_bauro_area = sum(1 for r in enr if r.lat and r.lon and in_profile_area_parcel(r.lat, r.lon, "bauro", r.parcel))
         print(f"ofert w obszarze BAURO: {n_bauro_area}")

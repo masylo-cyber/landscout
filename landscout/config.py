@@ -44,6 +44,8 @@ class Area(BaseModel):
     center: tuple[float, float]
     radius_km: float
     olx: str | None = None
+    commune: str | None = None   # gmina wg ULDK
+    district: str | None = None  # dzielnica Warszawy (ULDK: commune "Warszawa", region zawiera dzielnicę)
 
 
 @lru_cache

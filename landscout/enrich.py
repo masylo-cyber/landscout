@@ -150,9 +150,31 @@ def mpzp_by_xy(lat: float, lon: float) -> dict:
     return {"has_plan": True, "fields": kv, "links": links[:5], "symbols": syms[:10], "raw": text[:1500]}
 
 
-def match_area(lat: float, lon: float) -> tuple[str | None, str | None, str | None]:
-    """Zwraca (profil-źródło, nazwa obszaru, ring) najbliższego pasującego obszaru; profile 'galano' i 'bauro' są sprawdzane obie."""
-    best: tuple[float, str, Area] | None = None
+def _norm(x: str | None) -> str:
+    return (x or "").strip().lower().replace("-", " ")
+
+
+def match_area(lat: float, lon: float, parcel: dict | None = None) -> tuple[str | None, str | None, str | None]:
+    """Zwraca (profil-źródło, nazwa obszaru, ring). Najpierw po gminie/dzielnicy z ULDK, potem po promieniu."""
+    parcel = parcel or {}
+    commune = _norm(parcel.get("commune"))
+    region = _norm(parcel.get("region"))
+    if commune:
+        best: tuple[float, str, Area] | None = None
+        for prof, lst in areas().items():
+            for a in lst:
+                hit = False
+                if a.district and "warszawa" in commune and _norm(a.district) in (region + " " + commune):
+                    hit = True
+                elif a.commune and _norm(a.commune) == commune.replace(" (gmina)", ""):
+                    hit = True
+                if hit:
+                    dkm = haversine_km((lat, lon), a.center)
+                    if best is None or dkm < best[0]:
+                        best = (dkm, prof, a)
+        if best:
+            return best[1], best[2].name, best[2].ring
+    best = None
     for prof, lst in areas().items():
         for a in lst:
             dkm = haversine_km((lat, lon), a.center)
@@ -161,6 +183,21 @@ def match_area(lat: float, lon: float) -> tuple[str | None, str | None, str | No
     if best is None:
         return None, None, None
     return best[1], best[2].name, best[2].ring
+
+
+def in_profile_area_parcel(lat: float, lon: float, profile: str, parcel: dict | None = None) -> bool:
+    parcel = parcel or {}
+    commune = _norm(parcel.get("commune"))
+    region = _norm(parcel.get("region"))
+    for a in areas().get(profile, []):
+        if commune:
+            if a.district and "warszawa" in commune and _norm(a.district) in (region + " " + commune):
+                return True
+            if a.commune and _norm(a.commune) == commune:
+                return True
+        if haversine_km((lat, lon), a.center) <= a.radius_km:
+            return True
+    return False
 
 
 def in_profile_area(lat: float, lon: float, profile: str) -> bool:
@@ -174,12 +211,12 @@ def enrich(row: Listing) -> None:
         if pt:
             row.lat, row.lon = pt
     if row.lat is not None and row.lon is not None:
-        _, row.area_name, row.ring = match_area(row.lat, row.lon)
         if not row.parcel:
             row.parcel = parcel_by_xy(row.lat, row.lon)
             row.parcel_id = (row.parcel or {}).get("id")
             if not row.area_m2 and row.parcel.get("area_m2_geom"):
                 row.area_m2 = float(row.parcel["area_m2_geom"])
+        _, row.area_name, row.ring = match_area(row.lat, row.lon, row.parcel)
         if not row.mpzp:
             row.mpzp = mpzp_by_xy(row.lat, row.lon)
     row.enriched_at = datetime.now(timezone.utc)

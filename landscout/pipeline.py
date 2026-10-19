@@ -61,6 +61,16 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                 row.deactivated_at = row.last_seen
             db.commit()
 
+            # 1a) wynajem domów (osobny czat, wysyłka od razu)
+            if not only_source:
+                try:
+                    from .rentals import run_rentals
+                    stats.update(run_rentals(send=not no_alerts))
+                except Exception as e:  # noqa: BLE001
+                    db.rollback()
+                    errors.append(f"wynajem: {e}")
+                    log.exception("wynajem")
+
             # 1b) oferty porównawcze (domy/mieszkania) do radaru rynku
             if not only_source:
                 try:

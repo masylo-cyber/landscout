@@ -29,6 +29,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("telegram-setup", help="wykryj chat_id po /start")
     sub.add_parser("reset-alerts", help="zapomnij, co już alertowano (następny run wyśle od nowa aktualne alerty)")
     t = sub.add_parser("test-alert", help="wyślij testowy alert")
+    wy = sub.add_parser("wynajem", help="przeszukaj wynajem domów (≥220 m², rok ≥2020, bez szeregów)")
+    wy.add_argument("--no-send", action="store_true")
     an = sub.add_parser("analiza", help="pełna analiza oferty z linku (+ wysyłka na Telegram)")
     an.add_argument("url")
     an.add_argument("--send", action="store_true", help="wyślij kartę na czat Galano/BAURO")
@@ -77,6 +79,11 @@ def main(argv: list[str] | None = None) -> int:
             print("Zapisano chat_id:", found)
         else:
             print("Nie znaleziono. Napisz do bota '/start galano' lub '/start bauro' i uruchom ponownie.")
+    elif a.cmd == "wynajem":
+        from .db import init_db
+        from .rentals import run_rentals
+        init_db()
+        print(run_rentals(send=not a.no_send))
     elif a.cmd == "analiza":
         from .adhoc import analyze_url
         from .notify import card_text, send_telegram

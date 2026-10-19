@@ -255,6 +255,12 @@ def handle(text: str, chat: str, reply_to: str = "") -> str | None:
         return _lessons(arg)
     if cmd in ("/usun", "/usuń"):
         return _del_lesson(arg) if _known_chat(chat) else None
+    if cmd in ("/wynajem",):
+        from .db import Rental
+        with session() as db:
+            rows = db.scalars(select(Rental).where(Rental.active.is_(True), Rental.matches.is_(True)).order_by(Rental.price_pln).limit(15)).all()
+            from .rentals import card as rcard
+            return "\n\n".join(rcard(r) for r in rows) if rows else "Brak domów na wynajem spełniających kryteria (≥220 m², rok ≥2020, bez szeregów)."
     if cmd in ("/rynek", "/market"):
         return _market(arg)
     if cmd in ("/analiza", "/analizuj", "/a"):
@@ -294,7 +300,14 @@ def poll_once() -> int:
         if not chat or not txt:
             continue
         if txt.lower().startswith("/start"):
-            continue  # obsługuje discover_chat_ids
+            low = txt.lower()
+            names = [p for p in ("galano", "bauro", "wynajem") if p in low]
+            if names:
+                with session() as db:
+                    for p in names:
+                        kv_set(db, f"tg_chat_{p}", chat)
+                _send(chat, "✅ Ten czat odbiera: " + ", ".join(names))
+            continue
         rt = (m.get("reply_to_message") or {})
         reply = handle(txt, chat, (rt.get("text") or rt.get("caption") or ""))
         if reply:

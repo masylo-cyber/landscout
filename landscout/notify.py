@@ -107,7 +107,8 @@ def telegram_chat_id(profile: str) -> str:
     s = settings()
     if profile == "mw":
         profile = "bauro"   # wielorodzinna idzie na czat BAURO
-    env = s.telegram_chat_galano if profile == "galano" else s.telegram_chat_bauro
+    import os
+    env = {"galano": s.telegram_chat_galano, "bauro": s.telegram_chat_bauro}.get(profile) or os.environ.get(f"TELEGRAM_CHAT_ID_{profile.upper()}", "")
     if env:
         return env
     with session() as db:

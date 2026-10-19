@@ -85,3 +85,13 @@ def test_sale_price_fallback_not_premium():
     from landscout.proforma import sale_price
     v, k = sale_price("mw", "Złotokłos")
     assert v <= 10000 and "lokalnie" in k
+
+
+def test_rental_filter():
+    from landscout.db import Rental
+    from landscout.rentals import _matches
+    ok = Rental(source="t", external_id="1", url="u", title="", area_m2=250, build_year=2022, building_type="semi_detached")
+    old = Rental(source="t", external_id="2", url="u", title="", area_m2=250, build_year=2015, building_type="detached")
+    row = Rental(source="t", external_id="3", url="u", title="", area_m2=260, build_year=2023, building_type="ribbon")
+    small = Rental(source="t", external_id="4", url="u", title="", area_m2=180, build_year=2023, building_type="detached")
+    assert _matches(ok) and not _matches(old) and not _matches(row) and not _matches(small)

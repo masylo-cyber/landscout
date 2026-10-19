@@ -115,6 +115,34 @@ class Comp(Base):
     raw: Mapped[dict] = mapped_column(JSON, default=dict)     # m.in. investmentUnitsNumber, investmentState, priceFrom
 
 
+class Rental(Base):
+    """Dom / bliźniak na wynajem (osobny moduł, osobny czat Telegram)."""
+    __tablename__ = "rentals"
+    __table_args__ = (UniqueConstraint("source", "external_id", name="uq_rental_source_ext"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String(40))
+    external_id: Mapped[str] = mapped_column(String(120))
+    url: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(Text, default="")
+    price_pln: Mapped[float | None] = mapped_column(Float)
+    area_m2: Mapped[float | None] = mapped_column(Float)
+    plot_m2: Mapped[float | None] = mapped_column(Float)
+    rooms: Mapped[int | None] = mapped_column(Integer)
+    build_year: Mapped[int | None] = mapped_column(Integer)
+    building_type: Mapped[str | None] = mapped_column(String(40))   # detached | semi_detached | ribbon | ?
+    location_text: Mapped[str] = mapped_column(Text, default="")
+    lat: Mapped[float | None] = mapped_column(Float)
+    lon: Mapped[float | None] = mapped_column(Float)
+    image: Mapped[str | None] = mapped_column(Text)
+    free_from: Mapped[str | None] = mapped_column(String(20))
+    checked: Mapped[bool] = mapped_column(Boolean, default=False)   # szczegóły (rok, typ) pobrane
+    matches: Mapped[bool] = mapped_column(Boolean, default=False)
+    alerted: Mapped[bool] = mapped_column(Boolean, default=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Lesson(Base):
     """Uwaga/zasada od inwestora z Telegrama – doklejana do promptu analizy."""
     __tablename__ = "lessons"

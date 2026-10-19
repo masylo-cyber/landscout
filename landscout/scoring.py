@@ -18,7 +18,7 @@ RURAL = re.compile(r"\brolna\b|\brolne\b|siedlisk|\bRM\b|\bR\d|\bZL\b|leśn|\bLs
 NUISANCE = re.compile(r"\bS7\b|\bS2\b|\bS8\b|\bA2\b|przy trasie|przy drodze krajowej|linia (?:WN|wysokiego)|tory|kolej|lotnisk|oczyszczal|składowisk", re.I)
 
 
-NON_RESIDENTIAL = re.compile(r"usługow|us[łl]ugi\b|przemysł|produkcyj|magazynow|logistyc|handlow|komercyjn|\bU\b|\bP/U\b|\bPU\b|\bU/MN\b|\bMN/U\b", re.I)
+NON_RESIDENTIAL = re.compile(r"pod firm|pod działalnoś|usługow|us[łl]ugi\b|przemysł|produkcyj|magazynow|logistyc|handlow|komercyjn|\bU\b|\bP/U\b|\bPU\b|\bU/MN\b|\bMN/U\b", re.I)
 RESIDENTIAL = re.compile(r"\bMN|mieszkan|jednorodzinn|bli[źz]niak|szereg|\bdom", re.I)
 
 

@@ -121,6 +121,9 @@ def _details(c, r: Rental) -> None:
             r.building_type = ch.get("building_type") or r.building_type
             r.rooms = int(ch["rooms_num"]) if str(ch.get("rooms_num", "")).isdigit() else r.rooms
             r.free_from = ch.get("free_from") or r.free_from
+            co = ((ad.get("location") or {}).get("coordinates")) or {}
+            if co.get("latitude") and co.get("longitude"):
+                r.lat, r.lon = to_float(co["latitude"]), to_float(co["longitude"])
             if ch.get("m") and not r.area_m2:
                 r.area_m2 = to_float(ch["m"])
             if ch.get("terrain_area") and not r.plot_m2:
@@ -155,6 +158,40 @@ def _matches(r: Rental) -> bool:
         return False
     km = _km(r)
     return km is not None and km <= MAX_KM
+
+
+def _basic_ok(r: Rental) -> bool:
+    """Warunki bez lokalizacji (rok, metraż, typ) i nie Warszawa – tylko takim warto ustalać współrzędne."""
+    if WARSAW.search(f"{r.location_text} {r.title}"):
+        return False
+    if r.checked and not (r.build_year and r.build_year >= MIN_YEAR and (r.area_m2 or 0) >= MIN_AREA
+                          and (r.building_type or "") not in ("ribbon", "terraced")):
+        return False
+    return True
+
+
+def _locate(c, db) -> None:
+    """Współrzędne: strona oferty (Otodom), potem geokoder. Jedna próba na ofertę."""
+    from .enrich import _geocode_variants, geocode
+    rows = db.scalars(select(Rental).where(Rental.active.is_(True), Rental.lat.is_(None),
+                                           Rental.geo_tried.isnot(True))).all()
+    for r in rows:
+        if not _basic_ok(r):
+            continue
+        if r.source == "otodom":
+            try:
+                _details(c, r)
+                r.checked = True
+            except Exception as e:  # noqa: BLE001
+                log.debug("wynajem współrzędne %s: %s", r.url, e)
+        if r.lat is None:
+            for hint in _geocode_variants(r.location_text or r.title)[:3]:
+                pt = geocode(hint)
+                if pt:
+                    r.lat, r.lon = pt
+                    break
+        r.geo_tried = True
+        db.commit()
 
 
 def card(r: Rental) -> str:
@@ -196,14 +233,7 @@ def run_rentals(send: bool = True) -> dict:
                         setattr(r, k, v)
             r.last_seen, r.active = now, True
         db.commit()
-        from .enrich import _geocode_variants, geocode
-        for r in db.scalars(select(Rental).where(Rental.active.is_(True), Rental.lat.is_(None))):
-            for hint in _geocode_variants(r.location_text or r.title):
-                pt = geocode(hint)
-                if pt:
-                    r.lat, r.lon = pt
-                    break
-        db.commit()
+        _locate(c, db)
         for r in db.scalars(select(Rental).where(Rental.active.is_(True), Rental.checked.is_(True))):
             r.matches = _matches(r)
         db.commit()

@@ -138,6 +138,7 @@ class Rental(Base):
     image: Mapped[str | None] = mapped_column(Text)
     free_from: Mapped[str | None] = mapped_column(String(20))
     checked: Mapped[bool] = mapped_column(Boolean, default=False)   # szczegóły (rok, typ) pobrane
+    geo_tried: Mapped[bool] = mapped_column(Boolean, default=False)  # próba ustalenia współrzędnych już była
     matches: Mapped[bool] = mapped_column(Boolean, default=False)
     alerted: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -193,6 +194,9 @@ def init_db():
                           ("alerted_hala", "BOOLEAN DEFAULT FALSE")):
             if name not in cols:
                 conn.execute(text(f"ALTER TABLE listings ADD COLUMN {name} {ddl}"))
+        rcols = {c["name"] for c in insp.get_columns("rentals")}
+        if "geo_tried" not in rcols:
+            conn.execute(text("ALTER TABLE rentals ADD COLUMN geo_tried BOOLEAN DEFAULT FALSE"))
 
 
 def session() -> Session:

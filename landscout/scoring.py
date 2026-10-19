@@ -325,5 +325,10 @@ def score(row: Listing) -> None:
             sc += 6
         sc = max(0.0, min(100.0, sc))
         setattr(row, f"score_{prof}", round(sc, 1))
-        if mp < 8 and getattr(row, f"verdict_{prof}") == "alert":
+        if mp < 15 and getattr(row, f"verdict_{prof}") == "alert":
             setattr(row, f"verdict_{prof}", "review")
+    # alert tylko z ceną (oferty "zapytaj o cenę" / 0 zł -> do przeglądu)
+    if not row.price_pln or row.price_pln < 10000:
+        for prof in ("galano", "bauro", "mw"):
+            if getattr(row, f"verdict_{prof}") == "alert":
+                setattr(row, f"verdict_{prof}", "review")

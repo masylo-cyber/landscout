@@ -90,6 +90,18 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                     errors.append(f"enrich #{row.id}: {e}")
                     log.exception("enrich #%s", row.id)
 
+            # dobierz najwyżej ocenione oferty bez analizy (np. starsze, gdy analiza wcześniej nie wyszła) – to one są najlepsze
+            if len(to_analyze) < llm_budget:
+                from sqlalchemy import func as _f
+                best = _f.greatest(_f.coalesce(Listing.score_galano, 0), _f.coalesce(Listing.score_bauro, 0), _f.coalesce(Listing.score_mw, 0))
+                cand = db.scalars(select(Listing).where(Listing.active.is_(True), Listing.lat.isnot(None), Listing.kind != "dom",
+                                                        Listing.status != "rejected", best >= 50)
+                                  .order_by(best.desc()).limit(600))
+                for row in cand:
+                    if len(to_analyze) >= llm_budget:
+                        break
+                    if not row.analysis and row.id not in to_analyze:
+                        to_analyze.append(row.id)
             if to_analyze:
                 n_ok = analyze_many(to_analyze, workers=4)
                 stats["analyzed"] += n_ok
@@ -152,6 +164,8 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                     kv_set(db, "alert_batch_at", datetime.now(timezone.utc).isoformat())
                     db.commit()
                 for prof in ("galano", "bauro"):
+                    if not due:
+                        break      # skrót "do przejrzenia" tylko razem z paczką (nie częściej niż co ALERT_INTERVAL_DAYS)
                     try:
                         stats[f"digest_{prof}"] = digest(prof)
                     except Exception as e:  # noqa: BLE001

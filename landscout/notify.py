@@ -221,6 +221,7 @@ def digest(profile: str, min_area: float = 1500, limit: int = 10) -> int:
         sc = getattr(Listing, f"score_{profile}")
         rows = db.scalars(select(Listing).where(Listing.active.is_(True), vd == "review", Listing.area_name.isnot(None),
                                                 Listing.area_m2 >= min_area, Listing.status.notin_(["rejected"]),
+                                                Listing.price_pln >= 10000,
                                                 getattr(Listing, f"alerted_{profile}").is_(False))
                           .order_by(sc.desc()).limit(limit * 3)).all()
         rows = [r for r in rows if r.id not in sent_ids][:limit]
@@ -228,7 +229,7 @@ def digest(profile: str, min_area: float = 1500, limit: int = 10) -> int:
             kv_set(db, f"digest_{profile}_day", today)
             return 0
         head = {"galano": "🏘 GALANO", "bauro": "🌲 BAURO", "mw": "🏢 BAURO MW"}[profile]
-        lines = [f"<b>{head} – do przejrzenia ({today})</b> · bez potwierdzenia w planie, ale w obszarze:"]
+        lines = [f"<b>{head} – do przejrzenia ({today})</b> · wysoka ocena, ale bez potwierdzenia planu/segmentów:"]
         for r in rows:
             where = (r.location_text or "").split(",")[0] or r.area_name
             if r.area_name and r.area_name.split(" (")[0] not in where:

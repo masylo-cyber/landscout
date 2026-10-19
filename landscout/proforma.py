@@ -26,6 +26,10 @@ def sale_price(profile: str, area_name: str | None) -> tuple[float, str]:
                 best = (k, v)
     if best:
         return float(best[1]), best[0]
+    if profile in ("mw", "bauro"):
+        # obszar spoza tabeli: nie zgadujemy cen premium/mieszkań – bierzemy lokalną cenę domów (tabela Galano)
+        v, k = sale_price("galano", area_name)
+        return v, f"lokalnie ({k})"
     return float(tbl["default"]), "default"
 
 

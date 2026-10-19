@@ -264,6 +264,8 @@ def score_mw(row: Listing) -> tuple[float, str]:
     a = row.analysis or {}
     if not (row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "mw", row.parcel, row.location_text)):
         return 0.0, "reject"
+    if (row.ring or "dalej") == "dalej":
+        return 0.0, "reject"            # gmina z listy MW, ale wieś w dalszym pierścieniu (np. Złotokłos w gm. Piaseczno)
     if row.area_m2 and row.area_m2 < prof["min_area_m2"]:
         return 5.0, "reject"
     syms = " ".join((row.mpzp or {}).get("symbols") or []) + " " + (a.get("zoning_symbol") or "")

@@ -79,3 +79,9 @@ def test_galano_two_houses_good_margin_alerts():
                   mpzp={"has_plan": True, "symbols": ["MN"]}, analysis={}, parcel={}, images=[], raw={}, price_history=[])
     score(row)
     assert row.verdict_galano == "alert", (row.verdict_galano, row.segments_est, (row.proforma_galano or {}).get("margin_pct"))
+
+
+def test_sale_price_fallback_not_premium():
+    from landscout.proforma import sale_price
+    v, k = sale_price("mw", "Złotokłos")
+    assert v <= 10000 and "lokalnie" in k

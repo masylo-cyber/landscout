@@ -209,6 +209,21 @@ def refresh_market(db, max_age_days: int = 7, limit: int = 400) -> int:
     return n
 
 
+def _fill_description(row: Listing) -> None:
+    """Listy portali dają skrócony opis (albo żaden) – przed analizą pobierz pełny ze strony oferty."""
+    if len(row.description or "") >= 400 or not row.url:
+        return
+    try:
+        from .adhoc import fetch_offer
+        o = fetch_offer(row.url)
+        if len(o.description or "") > len(row.description or ""):
+            row.description = o.description[:12000]
+        if not row.price_pln and o.price_pln:
+            row.price_pln = o.price_pln
+    except Exception as e:  # noqa: BLE001
+        log.debug("opis %s: %s", row.url, e)
+
+
 def analyze_many(ids: list[int], workers: int = 4) -> int:
     """Analiza LLM równolegle; każdy wątek ma własną sesję DB. Zwraca liczbę udanych analiz."""
     from concurrent.futures import ThreadPoolExecutor
@@ -218,6 +233,7 @@ def analyze_many(ids: list[int], workers: int = 4) -> int:
             row = db.get(Listing, lid)
             if not row or row.analysis:
                 return False
+            _fill_description(row)
             ok = bool(analyze(row))
             if ok:
                 score(row)
@@ -232,7 +248,7 @@ def analyze_many(ids: list[int], workers: int = 4) -> int:
     return ok
 
 
-def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = False) -> dict:
+def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = False, reanalyze: int = 0) -> dict:
     """Przelicza scoring wszystkich wzbogaconych ofert (po zmianie reguł) bez ponownego pobierania."""
     init_db()
     n = n_mpzp = n_llm = n_geo = 0
@@ -248,7 +264,7 @@ def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = 
                     n_geo += 1
             db.commit()
         for row in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.enriched_at.isnot(None))):
-            if refresh_mpzp and row.lat and row.lon and not (row.mpzp or {}).get("has_plan"):
+            if refresh_mpzp and row.lat and row.lon and not (row.mpzp or {}).get("symbols"):
                 mp = mpzp_by_xy(row.lat, row.lon)
                 if mp:
                     row.mpzp = mp
@@ -263,6 +279,19 @@ def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = 
             if n % 50 == 0:
                 db.commit()
         db.commit()
+    if reanalyze:
+        # najlepiej ocenione, które analizowano bez opisu -> wyczyść analizę, analyze_many pobierze pełny opis
+        with session() as db:
+            best = []
+            for row in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.lat.isnot(None), Listing.kind != "dom")):
+                sc = max(row.score_galano or 0, row.score_bauro or 0, row.score_mw or 0)
+                if row.analysis and len(row.description or "") < 400 and sc >= 25:
+                    best.append((sc, row.id))
+            for _, lid in sorted(best, reverse=True)[:reanalyze]:
+                db.get(Listing, lid).analysis = {}
+                pending_llm.append((999, lid))
+            db.commit()
+        llm_missing = max(llm_missing, reanalyze)
     if pending_llm:
         top = [lid for _, lid in sorted(pending_llm, reverse=True)[:llm_missing]]   # najlepiej ocenione najpierw
         n_llm = analyze_many(top, workers=4)

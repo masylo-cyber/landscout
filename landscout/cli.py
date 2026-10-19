@@ -24,6 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     rs = sub.add_parser("rescore", help="przelicz scoring istniejących ofert")
     rs.add_argument("--refresh-mpzp", action="store_true", help="ponownie odpytaj rejestr MPZP tam, gdzie brak")
     rs.add_argument("--llm", type=int, default=0, help="ile brakujących analiz modelem dorobić")
+    rs.add_argument("--reanalyze", type=int, default=0, help="ponowna analiza N najlepszych ofert analizowanych bez pełnego opisu")
     rs.add_argument("--regeocode", action="store_true", help="oferty poza obszarem z samą ulicą -> ponowne geokodowanie przy następnym run")
     sub.add_parser("telegram-setup", help="wykryj chat_id po /start")
     sub.add_parser("reset-alerts", help="zapomnij, co już alertowano (następny run wyśle od nowa aktualne alerty)")
@@ -48,7 +49,7 @@ def main(argv: list[str] | None = None) -> int:
         uvicorn.run("landscout.web.app:app", host="0.0.0.0", port=8080, log_level="info")
     elif a.cmd == "rescore":
         from .pipeline import rescore
-        print(rescore(refresh_mpzp=a.refresh_mpzp, llm_missing=a.llm, regeocode=a.regeocode))
+        print(rescore(refresh_mpzp=a.refresh_mpzp, llm_missing=a.llm, regeocode=a.regeocode, reanalyze=a.reanalyze))
     elif a.cmd == "stats":
         from .stats import stats
         stats()

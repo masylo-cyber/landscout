@@ -147,7 +147,38 @@ def mpzp_by_xy(lat: float, lon: float) -> dict:
     links = [a.get("href") for a in soup.select("a[href]") if a.get("href", "").startswith("http")]
     sym_src = " ".join(v for k, v in kv.items() if re.search(r"przeznacz|symbol|oznacz|funkc", k, re.I))
     syms = sorted({m.group(1) for m in ZONING.finditer(sym_src)}) if sym_src else []
-    return {"has_plan": True, "fields": kv, "links": links[:5], "symbols": syms[:10], "raw": text[:1500]}
+    zones = [] if kv else _parse_plain_zones(text)
+    if zones:
+        z0 = zones[0]   # pierwszy rekord = teren w punkcie
+        kv = {"przeznaczenie": z0["purpose"], "symbol": z0["symbol"], "plan": z0["plan"]}
+        syms = sorted({z0["base"]})
+    return {"has_plan": True, "fields": kv, "links": links[:5], "symbols": syms[:10], "zones": zones[:6], "raw": text[:1500]}
+
+
+ZONE_SYM = re.compile(r"^(?:\d{1,3}\.?\s*)?([A-Z]{1,4}(?:[/.-][A-Z]{1,4}){0,2}\d{0,2})$")
+
+
+def _parse_plain_zones(text: str) -> list[dict]:
+    """Nowy format KIMPZP (2026): bloki linii  [nr] / przeznaczenie / symbol (np. '5 MU', '3. KD-Z') / 'null' / nazwa planu / link."""
+    lines = [x.strip() for x in text.split("\n") if x.strip()]
+    out, seen = [], set()
+    for i, ln in enumerate(lines):
+        m = ZONE_SYM.match(ln)
+        if not m or i == 0:
+            continue
+        purpose = lines[i - 1]
+        if not re.search(r"[a-ząćęłńóśźż]{3}", purpose):
+            continue
+        j = i + 1
+        if j < len(lines) and lines[j].lower() == "null":
+            j += 1
+        plan = lines[j] if j < len(lines) and not lines[j].startswith("..") else ""
+        key = (ln, plan)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"symbol": re.sub(r"\s+", "", ln), "base": m.group(1), "purpose": purpose[:120], "plan": plan[:120]})
+    return out
 
 
 def _norm(x: str | None) -> str:

@@ -175,6 +175,20 @@ def _basic_ok(r: Rental) -> bool:
     return True
 
 
+def _gugik_near(c, text: str) -> tuple[float, float] | None:
+    """Geokoder GUGiK; przy wielu miejscowościach o tej samej nazwie bierze najbliższą Magdalenki."""
+    from .enrich import GUGIK_GEOCODE
+    try:
+        js = get(c, GUGIK_GEOCODE, params={"request": "GetAddress", "address": text, "srid": "4326"}).json() or {}
+    except Exception as e:  # noqa: BLE001
+        log.debug("gugik %s: %s", text, e)
+        return None
+    res = js.get("results") or {}
+    res = list(res.values()) if isinstance(res, dict) else res
+    pts = [(float(x["y"]), float(x["x"])) for x in res if x.get("x") and x.get("y")]
+    return min(pts, key=_dist) if pts else None
+
+
 def _locate(c, db) -> None:
     """Współrzędne: strona oferty (Otodom), potem geokoder. Jedna próba na ofertę."""
     from .enrich import _geocode_variants, geocode
@@ -192,7 +206,7 @@ def _locate(c, db) -> None:
         if r.lat is None:
             txt = re.sub(r"^\s*dom\s+", "", r.location_text or r.title or "", flags=re.I)
             for hint in _geocode_variants(txt)[:3]:
-                pt = geocode(hint if "mazowiec" in hint.lower() else f"{hint}, mazowieckie")
+                pt = _gugik_near(c, hint) or geocode(hint if "mazowiec" in hint.lower() else f"{hint}, mazowieckie")
                 # odrzuć trafienia w innym regionie (np. inny „Komorów”)
                 if pt and _dist(pt) <= 80:
                     r.lat, r.lon = pt

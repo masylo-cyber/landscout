@@ -95,3 +95,18 @@ def test_rental_filter():
     row = Rental(source="t", external_id="3", url="u", title="", area_m2=260, build_year=2023, building_type="ribbon")
     small = Rental(source="t", external_id="4", url="u", title="", area_m2=180, build_year=2023, building_type="detached")
     assert _matches(ok) and not _matches(old) and not _matches(row) and not _matches(small)
+
+
+def test_hala_scoring():
+    from landscout.hala import score_hala
+    base = dict(source="t", url="u", description="", kind="dzialka", parcel={}, images=[], raw={}, price_history=[], analysis={})
+    near = Listing(external_id="h1", title="Działka pod halę magazynową 2000 m2", area_m2=2000, price_pln=1_200_000,
+                   lat=52.08, lon=20.99, mpzp={"zones": [{"symbol": "3P/U", "purpose": "tereny produkcji i usług"}]}, **base)
+    far = Listing(external_id="h2", title="Działka pod halę 2000 m2", area_m2=2000, price_pln=900_000,
+                  lat=52.25, lon=21.30, mpzp={}, **base)
+    house = Listing(external_id="h3", title="Działka budowlana pod dom", area_m2=1500, price_pln=600_000,
+                    lat=52.07, lon=20.97, mpzp={"zones": [{"symbol": "MN", "purpose": "zabudowa jednorodzinna"}]}, **base)
+    sn, why, km = score_hala(near)
+    assert sn and sn > 80 and "plan" in why and km < 5
+    assert score_hala(far)[0] is None          # > 25 km
+    assert score_hala(house)[0] is None

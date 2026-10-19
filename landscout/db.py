@@ -76,6 +76,8 @@ class Listing(Base):
     location_grade: Mapped[int | None] = mapped_column(Integer)
     market: Mapped[dict] = mapped_column(JSON, default=dict)      # radar rynku 2 km (comps.market_stats)
     deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    score_hala: Mapped[float | None] = mapped_column(Float)          # grunt pod halę (osobny czat)
+    alerted_hala: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class RunLog(Base):
@@ -187,7 +189,8 @@ def init_db():
             conn.execute(text("ALTER TABLE listings ADD COLUMN verdict_mw VARCHAR(20)"))
             conn.execute(text("ALTER TABLE listings ADD COLUMN alerted_mw BOOLEAN DEFAULT FALSE"))
         for name, ddl in (("standard_grade", "INTEGER"), ("location_grade", "INTEGER"), ("market", "JSON DEFAULT '{}'"),
-                          ("deactivated_at", "TIMESTAMP WITH TIME ZONE")):
+                          ("deactivated_at", "TIMESTAMP WITH TIME ZONE"), ("score_hala", "FLOAT"),
+                          ("alerted_hala", "BOOLEAN DEFAULT FALSE")):
             if name not in cols:
                 conn.execute(text(f"ALTER TABLE listings ADD COLUMN {name} {ddl}"))
 

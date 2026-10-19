@@ -181,6 +181,15 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                     except Exception as e:  # noqa: BLE001
                         errors.append(f"digest {prof}: {e}")
 
+            # 4) grunty pod halę (osobny czat)
+            try:
+                from .hala import run_hala
+                stats.update(run_hala(send=not no_alerts))
+            except Exception as e:  # noqa: BLE001
+                db.rollback()
+                errors.append(f"hala: {e}")
+                log.exception("hala")
+
             runlog.finished = datetime.now(timezone.utc)
             runlog.stats = stats | {"seconds": round(time.time() - t0)}
             runlog.errors = errors

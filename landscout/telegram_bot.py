@@ -255,6 +255,16 @@ def handle(text: str, chat: str, reply_to: str = "") -> str | None:
         return _lessons(arg)
     if cmd in ("/usun", "/usuń"):
         return _del_lesson(arg) if _known_chat(chat) else None
+    if cmd in ("/hala", "/hale"):
+        from .hala import card as hcard, score_hala
+        with session() as db:
+            rows = db.scalars(select(Listing).where(Listing.active.is_(True), Listing.score_hala >= 40)
+                              .order_by(desc(Listing.score_hala)).limit(10)).all()
+            out = []
+            for r in rows:
+                _, why, km = score_hala(r)
+                out.append(hcard(r, why, km or 0))
+            return "\n\n".join(out) if out else "Brak gruntów pod halę w promieniu 25 km od Magdalenki."
     if cmd in ("/wynajem",):
         from .db import Rental
         with session() as db:
@@ -272,7 +282,8 @@ def handle(text: str, chat: str, reply_to: str = "") -> str | None:
                 "/analiza <link> – pełna analiza dowolnej oferty z linku\n"
                 "Odpowiedz na kartę oferty swoją uwagą – agent zapamięta zasadę i oceni ofertę ponownie\n"
                 "/uwaga <tekst> – ogólna zasada · /zasady – lista · /usun 3 – usuń zasadę\n"
-                "/cena Złotokłos 8500 [galano|bauro|mw] – Twoja cena sprzedaży dla obszaru")
+                "/cena Złotokłos 8500 [galano|bauro|mw] – Twoja cena sprzedaży dla obszaru\n"
+                "/wynajem – domy na wynajem · /hala – grunty pod halę")
     return None
 
 
@@ -301,7 +312,7 @@ def poll_once() -> int:
             continue
         if txt.lower().startswith("/start"):
             low = txt.lower()
-            names = [p for p in ("galano", "bauro", "wynajem") if p in low]
+            names = [p for p in ("galano", "bauro", "wynajem", "hala") if p in low]
             if names:
                 with session() as db:
                     for p in names:

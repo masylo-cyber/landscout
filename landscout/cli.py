@@ -29,6 +29,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("telegram-setup", help="wykryj chat_id po /start")
     sub.add_parser("reset-alerts", help="zapomnij, co już alertowano (następny run wyśle od nowa aktualne alerty)")
     t = sub.add_parser("test-alert", help="wyślij testowy alert")
+    ha = sub.add_parser("hala", help="grunty pod halę blisko Magdalenki")
+    ha.add_argument("--send", action="store_true", help="wyślij paczkę teraz (pomija odstęp 4 dni)")
     wy = sub.add_parser("wynajem", help="przeszukaj wynajem domów (≥220 m², rok ≥2020, bez szeregów)")
     wy.add_argument("--no-send", action="store_true")
     an = sub.add_parser("analiza", help="pełna analiza oferty z linku (+ wysyłka na Telegram)")
@@ -79,6 +81,11 @@ def main(argv: list[str] | None = None) -> int:
             print("Zapisano chat_id:", found)
         else:
             print("Nie znaleziono. Napisz do bota '/start galano' lub '/start bauro' i uruchom ponownie.")
+    elif a.cmd == "hala":
+        from .db import init_db
+        from .hala import run_hala
+        init_db()
+        print(run_hala(send=a.send, force=a.send))
     elif a.cmd == "wynajem":
         from .db import init_db
         from .rentals import run_rentals

@@ -14,6 +14,7 @@ case "${1:-help}" in
   run)     docker compose run --rm scheduler landscout run "${@:2}" ;;
   analiza) docker compose run --rm scheduler landscout analiza "${@:2}" ;;
   wynajem) docker compose run --rm scheduler landscout wynajem "${@:2}" ;;
+  hala)    docker compose run --rm scheduler landscout hala "${@:2}" ;;
   update)
     git pull --ff-only
     install -m 755 "$DIR/bin/landscout" /usr/local/bin/landscout

@@ -257,15 +257,15 @@ def rescore(refresh_mpzp: bool = False, llm_missing: int = 0, regeocode: bool = 
                 _, row.area_name, row.ring = match_area(row.lat, row.lon, row.parcel, row.location_text)
             score(row)
             in_bauro = bool(row.lat and row.lon and in_profile_area_parcel(row.lat, row.lon, "bauro", row.parcel, row.location_text))
-            if llm_missing > n_llm and not row.analysis and (row.verdict_galano != "reject" or row.verdict_bauro != "reject" or row.verdict_mw != "reject" or in_bauro):
-                pending_llm.append(row.id)
-                n_llm += 1
+            if llm_missing and not row.analysis and row.kind != "dom" and (row.verdict_galano != "reject" or row.verdict_bauro != "reject" or row.verdict_mw != "reject" or in_bauro):
+                pending_llm.append((max(row.score_galano or 0, row.score_bauro or 0, row.score_mw or 0), row.id))
             n += 1
             if n % 50 == 0:
                 db.commit()
         db.commit()
     if pending_llm:
-        n_llm = analyze_many(pending_llm, workers=4)
+        top = [lid for _, lid in sorted(pending_llm, reverse=True)[:llm_missing]]   # najlepiej ocenione najpierw
+        n_llm = analyze_many(top, workers=4)
     log.info("rescore: %d ofert, mpzp odświeżone: %d, analiz LLM: %d, do ponownego geokodowania: %d", n, n_mpzp, n_llm, n_geo)
     return {"rescored": n, "mpzp_refreshed": n_mpzp, "analyzed": n_llm, "regeocode_queued": n_geo}
 

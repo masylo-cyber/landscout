@@ -31,7 +31,7 @@ def test_match_area():
 
 def test_scoring_galano_alert():
     row = Listing(source="t", external_id="1", url="u", title="Działka 3000 m2 pod zabudowę bliźniaczą MN, media",
-                  description="MPZP MN, podział możliwy, droga asfaltowa", area_m2=3000, price_pln=1_200_000, area_name="Łazy",
+                  description="MPZP MN, podział możliwy, droga asfaltowa", area_m2=3000, price_pln=1_000_000, area_name="Łazy",
                   lat=52.09, lon=20.93, ring="pierscien", kind="dzialka", mpzp={"has_plan": True, "symbols": ["MN"]},
                   analysis={}, parcel={}, images=[], raw={}, price_history=[])
     score(row)
@@ -57,3 +57,16 @@ def test_market_line_and_sale_price():
     assert market_sale_price(st, "mw") is None
     line = market_line(st)
     assert "domy nowe" in line and "4 zniknęło" in line and "Osiedle X" in line
+
+
+def test_alert_requires_price_and_margin():
+    base = dict(source="t", url="u", title="Działka 3000 m2 pod zabudowę bliźniaczą MN, media",
+                description="MPZP MN, podział możliwy, droga asfaltowa", area_m2=3000, area_name="Łazy",
+                lat=52.09, lon=20.93, ring="pierscien", kind="dzialka", mpzp={"has_plan": True, "symbols": ["MN"]},
+                analysis={}, parcel={}, images=[], raw={}, price_history=[])
+    no_price = Listing(external_id="p0", price_pln=None, **base)
+    score(no_price)
+    assert no_price.verdict_galano != "alert"
+    thin = Listing(external_id="p1", price_pln=1_200_000, **base)   # marża < 15 %
+    score(thin)
+    assert thin.verdict_galano != "alert"

@@ -21,7 +21,7 @@ AREA_MIN, AREA_MAX, AREA_BEST = 800, 3500, (1500, 2800)
 HALA_TEXT = re.compile(r"pod hal|hal[aęiy]\b|magazyn|produkcyj|przemysł|składow|warsztat|baz[aęy] transport|logistyc|"
                        r"aktywności gospodarczej|działalnoś\w* gospodarcz|pod firm|\bP/?U\b|\bU/?P\b|\b\d*PU\b|\b\d*AG\b", re.I)
 WEAK_TEXT = re.compile(r"usługow|pod usługi|komercyjn", re.I)          # tylko w tytule i bez funkcji mieszkaniowej
-HOUSING = re.compile(r"jednorodzin|mieszkan|rezydenc|pod dom", re.I)
+HOUSING = re.compile(r"jednorodzin|wielorodzin|mieszkan|rezydenc|pod dom|bliźniacz|blzniacz", re.I)
 HALA_PURPOSE = re.compile(r"produkc|przemys|skład|magazyn|aktywno\w* gospodarcz|baz\w* ", re.I)
 HALA_SYM = re.compile(r"^(?:\d+\.?)?(P|U|PU|P/U|U/P|UP|AG|P-U|U-P|PS|UC)(?:[/.-]|$)", re.I)
 NOT_HALA = re.compile(r"usługi publiczne|oświat|sakraln|kultu religijnego|\bUO\b|\bUK\b|zabudowa jednorodzinna(?! z usług)", re.I)

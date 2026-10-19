@@ -23,7 +23,7 @@ MIN_YEAR = 2020
 MAGDALENKA = (52.0597, 20.9572)
 MAX_KM = 15            # okolice Magdalenki / gm. Lesznowola – im bliżej, tym wyżej; Warszawa wyłączona
 WARSAW = re.compile(r"warszaw|wilanów|ursynów|mokotów|wawer|białołęka|bielany|bemowo|targówek|wesoła|rembertów|ursus|włochy|"
-                    r"ochota|wola\b|żoliborz|śródmieście|praga|saska kępa|sadyba|powsin|zawady|kabaty|natolin|stegny", re.I)
+                    r"ochota|(?<![a-ząćęłńóśźż])wola\b|żoliborz|śródmieście|praga|saska kępa|sadyba|powsin|zawady|kabaty|natolin|stegny", re.I)
 OTODOM_LOCS = ["mazowieckie/warszawa/warszawa/warszawa", "mazowieckie/piaseczynski", "mazowieckie/pruszkowski",
                "mazowieckie/warszawski-zachodni", "mazowieckie/otwocki", "mazowieckie/grodziski", "mazowieckie/legionowski",
                "mazowieckie/minski", "mazowieckie/wolominski"]

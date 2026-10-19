@@ -175,8 +175,15 @@ def _basic_ok(r: Rental) -> bool:
     return True
 
 
-def _gugik_near(c, text: str) -> tuple[float, float] | None:
-    """Geokoder GUGiK; przy wielu miejscowościach o tej samej nazwie bierze najbliższą Magdalenki."""
+def _slug(t: str) -> str:
+    import unicodedata
+    t = (t or "").lower().replace("ł", "l")
+    return re.sub(r"[^a-z0-9]+", "-", unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode()).strip("-")
+
+
+def _gugik_near(c, text: str, url: str = "") -> tuple[float, float] | None:
+    """Geokoder GUGiK; przy wielu miejscowościach o tej samej nazwie: najpierw ta, której gmina/powiat jest w adresie
+    oferty (np. morizon …-grodziski-baranow-…), potem najbliższa Magdalenki."""
     from .enrich import GUGIK_GEOCODE
     try:
         js = get(c, GUGIK_GEOCODE, params={"request": "GetAddress", "address": text, "srid": "4326"}).json() or {}
@@ -185,7 +192,10 @@ def _gugik_near(c, text: str) -> tuple[float, float] | None:
         return None
     res = js.get("results") or {}
     res = list(res.values()) if isinstance(res, dict) else res
-    pts = [(float(x["y"]), float(x["x"])) for x in res if x.get("x") and x.get("y")]
+    res = [x for x in res if x.get("x") and x.get("y")]
+    u = _slug(url)
+    hit = [x for x in res if any(_slug(x.get(k) or "") and f"-{_slug(x.get(k))}-" in f"-{u}-" for k in ("commune", "county"))]
+    pts = [(float(x["y"]), float(x["x"])) for x in (hit or res)]
     return min(pts, key=_dist) if pts else None
 
 
@@ -206,7 +216,7 @@ def _locate(c, db) -> None:
         if r.lat is None:
             txt = re.sub(r"^\s*dom\s+", "", r.location_text or r.title or "", flags=re.I)
             for hint in _geocode_variants(txt)[:3]:
-                pt = _gugik_near(c, hint) or geocode(hint if "mazowiec" in hint.lower() else f"{hint}, mazowieckie")
+                pt = _gugik_near(c, hint, r.url) or geocode(hint if "mazowiec" in hint.lower() else f"{hint}, mazowieckie")
                 # odrzuć trafienia w innym regionie (np. inny „Komorów”)
                 if pt and _dist(pt) <= 80:
                     r.lat, r.lon = pt

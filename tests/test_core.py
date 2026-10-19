@@ -110,3 +110,11 @@ def test_hala_scoring():
     assert sn and sn > 80 and "plan" in why and km < 5
     assert score_hala(far)[0] is None          # > 25 km
     assert score_hala(house)[0] is None
+
+
+def test_hala_rejects_housing_with_services():
+    from landscout.hala import score_hala
+    r = Listing(source="t", external_id="h4", url="u", title="Działka budowlana w Wilanowie", description="", kind="dzialka",
+                area_m2=2000, price_pln=2_000_000, lat=52.10, lon=21.06, parcel={}, images=[], raw={}, price_history=[], analysis={},
+                mpzp={"zones": [{"symbol": "3MNU", "purpose": "zabudowa jednorodzinna z usługami"}]})
+    assert score_hala(r)[0] is None

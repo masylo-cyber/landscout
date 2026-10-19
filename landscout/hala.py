@@ -18,9 +18,11 @@ log = logging.getLogger("landscout.hala")
 MAGDALENKA = (52.0597, 20.9572)
 MAX_KM = 25
 AREA_MIN, AREA_MAX, AREA_BEST = 800, 3500, (1500, 2800)
-HALA_TEXT = re.compile(r"pod hal|hal[aęiy]\b|magazyn|produkcyj|przemysł|usługow|pod usługi|składow|warsztat|baz[aęy] transport|logistyc|"
-                       r"aktywności gospodarczej|działalnoś\w* gospodarcz|pod firm|komercyjn|\bP/?U\b|\bU/?P\b|\b\d*PU\b|\b\d*AG\b", re.I)
-HALA_PURPOSE = re.compile(r"usług|produkc|przemys|skład|magazyn|aktywno\w* gospodarcz|baz\w* ", re.I)
+HALA_TEXT = re.compile(r"pod hal|hal[aęiy]\b|magazyn|produkcyj|przemysł|składow|warsztat|baz[aęy] transport|logistyc|"
+                       r"aktywności gospodarczej|działalnoś\w* gospodarcz|pod firm|\bP/?U\b|\bU/?P\b|\b\d*PU\b|\b\d*AG\b", re.I)
+WEAK_TEXT = re.compile(r"usługow|pod usługi|komercyjn", re.I)          # tylko w tytule i bez funkcji mieszkaniowej
+HOUSING = re.compile(r"jednorodzin|mieszkan|rezydenc|pod dom", re.I)
+HALA_PURPOSE = re.compile(r"produkc|przemys|skład|magazyn|aktywno\w* gospodarcz|baz\w* ", re.I)
 HALA_SYM = re.compile(r"^(?:\d+\.?)?(P|U|PU|P/U|U/P|UP|AG|P-U|U-P|PS|UC)(?:[/.-]|$)", re.I)
 NOT_HALA = re.compile(r"usługi publiczne|oświat|sakraln|kultu religijnego|\bUO\b|\bUK\b|zabudowa jednorodzinna(?! z usług)", re.I)
 
@@ -28,10 +30,11 @@ NOT_HALA = re.compile(r"usługi publiczne|oświat|sakraln|kultu religijnego|\bUO
 def _evidence(r: Listing) -> tuple[int, str]:
     """Siła dowodu: 2 = plan (symbol/przeznaczenie), 1 = ogłoszenie / analiza, 0 = brak."""
     mp = r.mpzp or {}
-    for z in mp.get("zones") or []:
-        if HALA_SYM.match(z.get("symbol", "").replace(" ", "")) or HALA_PURPOSE.search(z.get("purpose", "")):
-            if not NOT_HALA.search(z.get("purpose", "")):
-                return 2, f"plan: {z.get('symbol')} – {z.get('purpose')}"
+    for z in (mp.get("zones") or [])[:1]:          # teren w punkcie działki
+        pur = z.get("purpose", "")
+        usl_only = re.search(r"usług", pur, re.I) and not HOUSING.search(pur)
+        if (HALA_SYM.match(z.get("symbol", "").replace(" ", "")) or HALA_PURPOSE.search(pur) or usl_only) and not NOT_HALA.search(pur):
+            return 2, f"plan: {z.get('symbol')} – {pur}"
     for sym in mp.get("symbols") or []:
         if HALA_SYM.match(sym):
             return 2, f"plan: {sym}"
@@ -41,8 +44,11 @@ def _evidence(r: Listing) -> tuple[int, str]:
         return 1, f"ogłoszenie/analiza: {zs}"
     txt = f"{r.title} {r.description or ''}"
     m = HALA_TEXT.search(txt)
-    if m and not NOT_HALA.search(r.title):
+    if m and not NOT_HALA.search(r.title) and not HOUSING.search(r.title):
         return 1, f"ogłoszenie: „{m.group(0)}”"
+    w = WEAK_TEXT.search(r.title)
+    if w and not HOUSING.search(r.title):
+        return 1, f"ogłoszenie: „{w.group(0)}” (do potwierdzenia, czy hala dopuszczona)"
     return 0, ""
 
 

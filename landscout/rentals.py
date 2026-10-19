@@ -150,6 +150,11 @@ def _km(r: Rental) -> float | None:
     return _dist_km(MAGDALENKA[0], MAGDALENKA[1], r.lat, r.lon) if r.lat and r.lon else None
 
 
+def _dist(pt: tuple[float, float]) -> float:
+    from .comps import _dist_km
+    return _dist_km(MAGDALENKA[0], MAGDALENKA[1], pt[0], pt[1])
+
+
 def _matches(r: Rental) -> bool:
     if not (r.build_year and r.build_year >= MIN_YEAR and (r.area_m2 or 0) >= MIN_AREA
             and (r.building_type or "") not in ("ribbon", "terraced")):
@@ -185,9 +190,11 @@ def _locate(c, db) -> None:
             except Exception as e:  # noqa: BLE001
                 log.debug("wynajem współrzędne %s: %s", r.url, e)
         if r.lat is None:
-            for hint in _geocode_variants(r.location_text or r.title)[:3]:
-                pt = geocode(hint)
-                if pt:
+            txt = re.sub(r"^\s*dom\s+", "", r.location_text or r.title or "", flags=re.I)
+            for hint in _geocode_variants(txt)[:3]:
+                pt = geocode(hint if "mazowiec" in hint.lower() else f"{hint}, mazowieckie")
+                # odrzuć trafienia w innym regionie (np. inny „Komorów”)
+                if pt and _dist(pt) <= 80:
                     r.lat, r.lon = pt
                     break
         r.geo_tried = True

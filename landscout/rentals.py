@@ -197,10 +197,17 @@ def run_rentals(send: bool = True) -> dict:
             r.active = False
         st["rent_matches"] = db.query(Rental).filter(Rental.active.is_(True), Rental.matches.is_(True)).count()
         if send:
+            # ten sam dom na kilku portalach -> jedna wiadomość (klucz: cena, metraż, rok)
+            key = lambda r: (round(r.price_pln or 0, -2), round(r.area_m2 or 0), r.build_year)  # noqa: E731
+            sent_keys = {key(r) for r in db.scalars(select(Rental).where(Rental.alerted.is_(True)))}
             for r in db.scalars(select(Rental).where(Rental.active.is_(True), Rental.matches.is_(True), Rental.alerted.is_(False))
                                 .order_by(Rental.price_pln)):
+                if key(r) in sent_keys:
+                    r.alerted = True
+                    continue
                 if send_telegram(card(r), "wynajem"):
                     r.alerted = True
+                    sent_keys.add(key(r))
                     st["rent_sent"] += 1
         db.commit()
     log.info("wynajem: %s", st)

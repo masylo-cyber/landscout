@@ -70,3 +70,12 @@ def test_alert_requires_price_and_margin():
     thin = Listing(external_id="p1", price_pln=1_200_000, **base)   # marża < 15 %
     score(thin)
     assert thin.verdict_galano != "alert"
+
+
+def test_galano_two_houses_good_margin_alerts():
+    row = Listing(source="t", external_id="z2", url="u", title="Działka budowlana 1800 m2 MPZP MN, media, podział na 2 działki",
+                  description="Plan MN, zabudowa jednorodzinna wolnostojąca, możliwość podziału na dwie działki, media w ulicy",
+                  area_m2=1800, price_pln=150_000, area_name="Złotokłos", lat=52.00, lon=20.95, ring="dalej", kind="dzialka",
+                  mpzp={"has_plan": True, "symbols": ["MN"]}, analysis={}, parcel={}, images=[], raw={}, price_history=[])
+    score(row)
+    assert row.verdict_galano == "alert", (row.verdict_galano, row.segments_est, (row.proforma_galano or {}).get("margin_pct"))

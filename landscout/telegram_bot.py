@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from html import escape
 
 import httpx
@@ -135,10 +136,82 @@ def _market(arg: str) -> str:
         return escape(market_line(row.market) or "Brak ofert porównawczych w 2 km") + ("\n" + escape(extra) if extra else "")
 
 
-def handle(text: str, chat: str) -> str | None:
+def _known_chat(chat: str) -> bool:
+    from .notify import telegram_chat_id
+    return chat in {telegram_chat_id("galano"), telegram_chat_id("bauro")}
+
+
+def _profile_for_chat(chat: str) -> str | None:
+    from .notify import telegram_chat_id
+    return "bauro" if chat == telegram_chat_id("bauro") else "galano" if chat == telegram_chat_id("galano") else None
+
+
+def _add_lesson(text: str, chat: str, lid: int | None) -> str:
+    """Zapisuje uwagę jako zasadę dla analizy; jeśli dotyczy oferty – analizuje ją ponownie i odsyła nową kartę."""
+    from .db import Lesson
+    text = text.strip()
+    if len(text) < 5:
+        return "Napisz uwagę, np. odpowiedz na kartę: „dla Galano 2 domy wystarczą, jeśli marża jest dobra”."
+    prof = _profile_for_chat(chat)
+    with session() as db:
+        les = Lesson(text=(f"[#{lid}] " if lid else "") + text[:500], listing_id=lid, profile=prof, active=True)
+        db.add(les)
+        db.commit()
+        les_id = les.id
+    out = f"📝 Zapamiętane jako zasada #{les_id} – uwzględnię w kolejnych analizach."
+    if lid:
+        from .analyze import analyze
+        from .pipeline import _fill_description
+        from .scoring import score
+        with session() as db:
+            row = db.get(Listing, lid)
+            if row:
+                row.analysis = {}
+                _fill_description(row)
+                analyze(row)
+                score(row)
+                db.commit()
+                out += "\n\nPonowna ocena:\n" + card_text(row, prof or "galano")
+    return out
+
+
+def _lessons(arg: str) -> str:
+    from .db import Lesson
+    with session() as db:
+        rows = db.scalars(select(Lesson).where(Lesson.active.is_(True)).order_by(Lesson.id)).all()
+        if not rows:
+            return "Brak zasad. Dodaj: odpowiedz na kartę oferty albo /uwaga <tekst>."
+        return "<b>Zasady dla analizy:</b>\n" + "\n".join(f"{r.id}. {escape(r.text)}" for r in rows) + "\n\nUsuń: /usun 3"
+
+
+def _del_lesson(arg: str) -> str:
+    from .db import Lesson
+    try:
+        les_id = int(arg.strip())
+    except ValueError:
+        return "Użycie: /usun 3"
+    with session() as db:
+        r = db.get(Lesson, les_id)
+        if not r:
+            return f"Nie ma zasady {les_id}"
+        r.active = False
+        db.commit()
+    return f"Zasada {les_id} usunięta."
+
+
+def handle(text: str, chat: str, reply_to: str = "") -> str | None:
     t = (text or "").strip()
     if not t.startswith("/"):
-        return None
+        # odpowiedź na kartę oferty = uwaga do tej oferty (nauka agenta)
+        ids = list(dict.fromkeys(re.findall(r"#(\d+)", reply_to or "")))
+        if not ids or not _known_chat(chat):
+            return None
+        own = re.search(r"#(\d+)", t)
+        if own:
+            return _add_lesson(re.sub(r"#\d+", "", t, count=1), chat, int(own.group(1)))
+        if len(ids) > 1:
+            return "W tej wiadomości jest kilka ofert – dopisz numer, np. „#" + ids[0] + " dla Galano 2 domy wystarczą”."
+        return _add_lesson(t, chat, int(ids[0]))
     cmd, _, arg = t.partition(" ")
     cmd = cmd.lower().split("@")[0]
     if cmd == "/status":
@@ -155,6 +228,15 @@ def handle(text: str, chat: str) -> str | None:
         return _set_status(arg, "visit")
     if cmd in ("/std", "/standard", "/lok", "/otoczenie", "/otocz"):
         return _set_grade(arg, "standard_grade" if cmd in ("/std", "/standard") else "location_grade")
+    if cmd in ("/uwaga", "/zasada", "/lekcja"):
+        if not _known_chat(chat):
+            return None
+        m = re.match(r"#?(\d+)\s+(.*)", arg.strip(), re.S)
+        return _add_lesson(m.group(2), chat, int(m.group(1))) if m else _add_lesson(arg, chat, None)
+    if cmd in ("/lekcje", "/zasady"):
+        return _lessons(arg)
+    if cmd in ("/usun", "/usuń"):
+        return _del_lesson(arg) if _known_chat(chat) else None
     if cmd in ("/rynek", "/market"):
         return _market(arg)
     if cmd in ("/analiza", "/analizuj", "/a"):
@@ -163,7 +245,9 @@ def handle(text: str, chat: str) -> str | None:
         return ("/status – ostatni przebieg\n/stats – liczby alertów\n/top galano|bauro|mw – 5 najlepszych\n"
                 "/ok 123 – dzwoniłem\n/nie 123 – odrzuć\n/ogledziny 123 – do oględzin\n"
                 "/std 123 4 – standard 1–5 (3 = typowy)\n/lok 123 2 – otoczenie 1–5\n/rynek 123 – radar rynku 2 km\n"
-                "/analiza <link> – pełna analiza dowolnej oferty z linku")
+                "/analiza <link> – pełna analiza dowolnej oferty z linku\n"
+                "Odpowiedz na kartę oferty swoją uwagą – agent zapamięta zasadę i oceni ofertę ponownie\n"
+                "/uwaga <tekst> – ogólna zasada · /zasady – lista · /usun 3 – usuń zasadę")
     return None
 
 
@@ -192,7 +276,8 @@ def poll_once() -> int:
             continue
         if txt.lower().startswith("/start"):
             continue  # obsługuje discover_chat_ids
-        reply = handle(txt, chat)
+        rt = (m.get("reply_to_message") or {})
+        reply = handle(txt, chat, (rt.get("text") or rt.get("caption") or ""))
         if reply:
             _send(chat, reply)
             n += 1

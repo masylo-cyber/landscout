@@ -17,6 +17,7 @@ galano:
     dalej: 4
   min_area_m2: 700
   max_price_pln: 15000000
+  margin_alert_pct: 18  # przy takiej marży alert także dla 2 domów (bez wymogu progu segmentów)
   near_miss_km: 35     # oferty spoza listy obszarów, ale w tym promieniu od Warszawy: nie odrzucaj, pokaż w sekcji 'poza listą'
   # słowa wykluczające (rolne bez planu, lasy, usługowe)
   exclude_keywords: ["rolna bez", "działka leśna", "grunt leśny", "usługowa", "przemysł", "siedliskowa", "rekreacyjna"]

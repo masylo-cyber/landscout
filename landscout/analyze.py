@@ -12,8 +12,8 @@ log = logging.getLogger("landscout.analyze")
 
 SYSTEM = """Jesteś analitykiem gruntów dla dewelopera z okolic Warszawy. Oceniasz ogłoszenia sprzedaży
 nieruchomości pod kątem dwóch celów:
-1) GALANO – zabudowa bliźniacza / szeregowa / małe domy w budżetowych lokalizacjach (liczy się liczba segmentów,
-   które realnie da się postawić).
+1) GALANO – zabudowa bliźniacza / szeregowa / małe domy w budżetowych lokalizacjach. Liczba segmentów NIE jest
+   kryterium odrzucenia: Galano bierze też działki pod 2 domy (wolnostojące lub bliźniak), jeśli marża jest dobra.
 2) BAURO – działki pod pojedyncze domy premium (Magdalenka, Konstancin, Wilanów, droższe dzielnice Warszawy).
 3) BAURO MW – działki pod zabudowę WIELORODZINNĄ w Warszawie i bliskich okolicach (MW, MW/U, U/MW, "wielorodzinna",
    "pod kamienicę/blok"); mw_possible = true tylko przy takim przeznaczeniu w planie/WZ/ogłoszeniu.
@@ -56,6 +56,21 @@ SCHEMA = """{
  "risks": ["krótkie hasła"],
  "summary_pl": "maks. 2 krótkie zdania po polsku, konkret dla inwestora: werdykt (dla kogo i dlaczego) + jedna rzecz do sprawdzenia. Bez powtarzania ceny/powierzchni."
 }"""
+
+
+def lessons_block() -> str:
+    """Zasady od inwestora (dodawane z Telegrama: odpowiedź na kartę lub /uwaga). Mają pierwszeństwo przed regułami ogólnymi."""
+    try:
+        from sqlalchemy import select
+        from .db import Lesson, session
+        with session() as db:
+            rows = db.scalars(select(Lesson).where(Lesson.active.is_(True)).order_by(Lesson.id.desc()).limit(40)).all()
+        if not rows:
+            return ""
+        return "\n\nZASADY OD INWESTORA (ważniejsze niż reguły ogólne powyżej):\n" + "\n".join(f"- {r.text}" for r in reversed(rows))
+    except Exception as e:  # noqa: BLE001
+        log.debug("lessons: %s", e)
+        return ""
 
 
 def _payload(row: Listing) -> str:
@@ -126,7 +141,7 @@ def analyze(row: Listing) -> dict:
         import anthropic
         cl = anthropic.Anthropic(api_key=s.anthropic_api_key, timeout=120, max_retries=2)
         msg = cl.messages.create(
-            model=s.claude_model, max_tokens=1500, system=SYSTEM,
+            model=s.claude_model, max_tokens=1500, system=SYSTEM + lessons_block(),
             tools=[TOOL], tool_choice={"type": "auto"},
             messages=[{"role": "user", "content": f"Oferta (JSON):\n{_payload(row)}\n\nUżyj narzędzia ocena_oferty. Opis pól (schemat):\n{SCHEMA}"}],
         )

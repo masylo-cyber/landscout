@@ -9,6 +9,7 @@ from .db import Listing
 from .enrich import in_priority_area, in_profile_area_parcel, near_warsaw_km
 
 RING_DEFAULT = "dalej"
+GALANO_MARGIN_ALERT = 18   # domyślny % marży, od której Galano alertuje niezależnie od progu segmentów (min. 2 domy); profiles.yml: margin_alert_pct
 
 # dowody, że na działce wolno budować (bez tego – najwyżej "do przeglądu")
 BUILD_EVIDENCE = re.compile(r"budowlan|\bMN\b|MN[a-z/]|warunk\w* zabudowy|\bWZ\b|pozwoleni\w* na budow|praw\w* zabudowy|inwestycyjn|pod zabudow|"
@@ -153,7 +154,7 @@ def score_galano(row: Listing) -> tuple[float, str, int]:
     if no_segments(row):
         # MN ekstensywne / tylko wolnostojące – dla Galano najwyżej do przeglądu (domy pojedyncze)
         n_single = int((row.area_m2 or 0) * prof.get("usable_factor", 0.85) // prof["m2_per_segment"]["wolnostojacy"])
-        return round(min(40.0, 10 + n_single * 6), 1), ("review" if n_single >= 3 else "reject"), n_single
+        return round(min(40.0, 10 + n_single * 6), 1), ("review" if n_single >= 2 else "reject"), n_single
     if rural and not evidence:
         n = min(n, 2)   # bez planu/WZ nie liczymy segmentów z czystej powierzchni
 
@@ -327,6 +328,14 @@ def score(row: Listing) -> None:
         setattr(row, f"score_{prof}", round(sc, 1))
         if mp < 15 and getattr(row, f"verdict_{prof}") == "alert":
             setattr(row, f"verdict_{prof}", "review")
+    # Galano: liczba segmentów nie jest kryterium samym w sobie – 2+ domy (także wolnostojące) z dobrą marżą = alert
+    pf = row.proforma_galano or {}
+    a = row.analysis or {}
+    fit = a.get("galano_fit")
+    if (row.verdict_galano == "review" and (pf.get("margin_pct") or 0) >= profiles()["galano"].get("margin_alert_pct", GALANO_MARGIN_ALERT) and (row.segments_est or 0) >= 2
+            and build_evidence(row) and not is_rural(row) and not non_residential(row) and not in_bauro
+            and row.verdict_mw != "alert" and (fit is None or fit >= 35)):
+        row.verdict_galano = "alert"
     # alert tylko z ceną (oferty "zapytaj o cenę" / 0 zł -> do przeglądu)
     if not row.price_pln or row.price_pln < 10000:
         for prof in ("galano", "bauro", "mw"):

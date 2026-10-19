@@ -115,6 +115,17 @@ class Comp(Base):
     raw: Mapped[dict] = mapped_column(JSON, default=dict)     # m.in. investmentUnitsNumber, investmentState, priceFrom
 
 
+class Lesson(Base):
+    """Uwaga/zasada od inwestora z Telegrama – doklejana do promptu analizy."""
+    __tablename__ = "lessons"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    text: Mapped[str] = mapped_column(Text)
+    listing_id: Mapped[int | None] = mapped_column(Integer)
+    profile: Mapped[str | None] = mapped_column(String(20))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class KV(Base):
     """Drobne ustawienia runtime (np. chat_id Telegrama wykryte po /start)."""
     __tablename__ = "kv"

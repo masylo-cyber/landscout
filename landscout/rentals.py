@@ -20,6 +20,10 @@ log = logging.getLogger("landscout.rentals")
 
 MIN_AREA = 220
 MIN_YEAR = 2020
+MAGDALENKA = (52.0597, 20.9572)
+MAX_KM = 15            # okolice Magdalenki / gm. Lesznowola – im bliżej, tym wyżej; Warszawa wyłączona
+WARSAW = re.compile(r"warszaw|wilanów|ursynów|mokotów|wawer|białołęka|bielany|bemowo|targówek|wesoła|rembertów|ursus|włochy|"
+                    r"ochota|wola\b|żoliborz|śródmieście|praga|saska kępa|sadyba|powsin|zawady|kabaty|natolin|stegny", re.I)
 OTODOM_LOCS = ["mazowieckie/warszawa/warszawa/warszawa", "mazowieckie/piaseczynski", "mazowieckie/pruszkowski",
                "mazowieckie/warszawski-zachodni", "mazowieckie/otwocki", "mazowieckie/grodziski", "mazowieckie/legionowski",
                "mazowieckie/minski", "mazowieckie/wolominski"]
@@ -138,15 +142,26 @@ def _details(c, r: Rental) -> None:
         r.area_m2 = to_float(a.group(1)) if a else None
 
 
+def _km(r: Rental) -> float | None:
+    from .comps import _dist_km
+    return _dist_km(MAGDALENKA[0], MAGDALENKA[1], r.lat, r.lon) if r.lat and r.lon else None
+
+
 def _matches(r: Rental) -> bool:
-    return bool(r.build_year and r.build_year >= MIN_YEAR and (r.area_m2 or 0) >= MIN_AREA
-                and (r.building_type or "") not in ("ribbon", "terraced"))
+    if not (r.build_year and r.build_year >= MIN_YEAR and (r.area_m2 or 0) >= MIN_AREA
+            and (r.building_type or "") not in ("ribbon", "terraced")):
+        return False
+    if WARSAW.search(f"{r.location_text} {r.title}"):
+        return False
+    km = _km(r)
+    return km is not None and km <= MAX_KM
 
 
 def card(r: Rental) -> str:
     t = TYPE_PL.get(r.building_type or "", r.building_type or "?")
     price = f"{r.price_pln:,.0f} zł/mies.".replace(",", " ") if r.price_pln else "cena ?"
-    parts = [f"<b>🏡 WYNAJEM</b> · {escape((r.location_text or '?')[:60])}",
+    km = _km(r)
+    parts = [f"<b>🏡 WYNAJEM</b> · {escape((r.location_text or '?')[:60])}" + (f" · <b>{km:.1f} km</b> od Magdalenki" if km is not None else ""),
              f"<b>{price}</b> · {r.area_m2 or 0:.0f} m² · {t} · rok {r.build_year or '?'}"
              + (f" · działka {r.plot_m2:.0f} m²" if r.plot_m2 else "") + (f" · {r.rooms} pok." if r.rooms else ""),
              escape(r.title[:120])]
@@ -181,6 +196,17 @@ def run_rentals(send: bool = True) -> dict:
                         setattr(r, k, v)
             r.last_seen, r.active = now, True
         db.commit()
+        from .enrich import _geocode_variants, geocode
+        for r in db.scalars(select(Rental).where(Rental.active.is_(True), Rental.lat.is_(None))):
+            for hint in _geocode_variants(r.location_text or r.title):
+                pt = geocode(hint)
+                if pt:
+                    r.lat, r.lon = pt
+                    break
+        db.commit()
+        for r in db.scalars(select(Rental).where(Rental.active.is_(True), Rental.checked.is_(True))):
+            r.matches = _matches(r)
+        db.commit()
         for r in db.scalars(select(Rental).where(Rental.active.is_(True), Rental.checked.is_(False))):
             if r.area_m2 and r.area_m2 < MIN_AREA:
                 r.checked = True
@@ -200,8 +226,8 @@ def run_rentals(send: bool = True) -> dict:
             # ten sam dom na kilku portalach -> jedna wiadomość (klucz: cena, metraż, rok)
             key = lambda r: (round(r.price_pln or 0, -2), round(r.area_m2 or 0), r.build_year)  # noqa: E731
             sent_keys = {key(r) for r in db.scalars(select(Rental).where(Rental.alerted.is_(True)))}
-            for r in db.scalars(select(Rental).where(Rental.active.is_(True), Rental.matches.is_(True), Rental.alerted.is_(False))
-                                .order_by(Rental.price_pln)):
+            pending = db.scalars(select(Rental).where(Rental.active.is_(True), Rental.matches.is_(True), Rental.alerted.is_(False))).all()
+            for r in sorted(pending, key=lambda x: _km(x) or 99):
                 if key(r) in sent_keys:
                     r.alerted = True
                     continue

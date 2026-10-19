@@ -90,7 +90,11 @@ def test_sale_price_fallback_not_premium():
 def test_rental_filter():
     from landscout.db import Rental
     from landscout.rentals import _matches
-    ok = Rental(source="t", external_id="1", url="u", title="", area_m2=250, build_year=2022, building_type="semi_detached")
+    ok = Rental(source="t", external_id="1", url="u", title="", area_m2=250, build_year=2022, building_type="semi_detached",
+                location_text="Łazy, Lesznowola", lat=52.10, lon=20.99)
+    waw = Rental(source="t", external_id="5", url="u", title="", area_m2=300, build_year=2024, building_type="detached",
+                 location_text="Wilanów Niski, Wilanów, Warszawa", lat=52.16, lon=21.08)
+    assert not _matches(waw)
     old = Rental(source="t", external_id="2", url="u", title="", area_m2=250, build_year=2015, building_type="detached")
     row = Rental(source="t", external_id="3", url="u", title="", area_m2=260, build_year=2023, building_type="ribbon")
     small = Rental(source="t", external_id="4", url="u", title="", area_m2=180, build_year=2023, building_type="detached")

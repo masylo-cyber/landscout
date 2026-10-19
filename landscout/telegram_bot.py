@@ -268,9 +268,9 @@ def handle(text: str, chat: str, reply_to: str = "") -> str | None:
     if cmd in ("/wynajem",):
         from .db import Rental
         with session() as db:
-            rows = db.scalars(select(Rental).where(Rental.active.is_(True), Rental.matches.is_(True)).order_by(Rental.price_pln).limit(15)).all()
-            from .rentals import card as rcard
-            return "\n\n".join(rcard(r) for r in rows) if rows else "Brak domów na wynajem spełniających kryteria (≥220 m², rok ≥2020, bez szeregów)."
+            from .rentals import _km, card as rcard
+            rows = sorted(db.scalars(select(Rental).where(Rental.active.is_(True), Rental.matches.is_(True))).all(), key=lambda x: _km(x) or 99)[:15]
+            return "\n\n".join(rcard(r) for r in rows) if rows else "Brak domów na wynajem spełniających kryteria (≥220 m², rok ≥2020, bez szeregów, do 15 km od Magdalenki, bez Warszawy)."
     if cmd in ("/rynek", "/market"):
         return _market(arg)
     if cmd in ("/analiza", "/analizuj", "/a"):

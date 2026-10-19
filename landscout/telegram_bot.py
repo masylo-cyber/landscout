@@ -175,6 +175,22 @@ def _add_lesson(text: str, chat: str, lid: int | None) -> str:
     return out
 
 
+def _set_price(arg: str) -> str:
+    """/cena Złotokłos 8500 [galano|bauro|mw] – cena sprzedaży zł/m² brutto dla obszaru (nadpisuje tabelę)."""
+    import json
+    m = re.match(r"(.+?)\s+(\d[\d\s]{2,})\s*(galano|bauro|mw)?\s*$", arg.strip(), re.I)
+    if not m:
+        return "Użycie: /cena Złotokłos 8500 [galano|bauro|mw] (domyślnie galano)"
+    area, val, prof = m.group(1).strip(), int(re.sub(r"\s", "", m.group(2))), (m.group(3) or "galano").lower()
+    with session() as db:
+        d = json.loads(kv_get(db, "price_overrides", "{}") or "{}")
+        d.setdefault(prof, {})[area] = val
+        kv_set(db, "price_overrides", json.dumps(d, ensure_ascii=False))
+    from . import proforma
+    proforma._OV["t"] = 0
+    return f"💰 {prof.upper()} {area}: {val:,} zł/m² brutto – użyję przy kolejnych przeliczeniach.".replace(",", " ")
+
+
 def _lessons(arg: str) -> str:
     from .db import Lesson
     with session() as db:
@@ -233,6 +249,8 @@ def handle(text: str, chat: str, reply_to: str = "") -> str | None:
             return None
         m = re.match(r"#?(\d+)\s+(.*)", arg.strip(), re.S)
         return _add_lesson(m.group(2), chat, int(m.group(1))) if m else _add_lesson(arg, chat, None)
+    if cmd in ("/cena",):
+        return _set_price(arg) if _known_chat(chat) else None
     if cmd in ("/lekcje", "/zasady"):
         return _lessons(arg)
     if cmd in ("/usun", "/usuń"):
@@ -247,7 +265,8 @@ def handle(text: str, chat: str, reply_to: str = "") -> str | None:
                 "/std 123 4 – standard 1–5 (3 = typowy)\n/lok 123 2 – otoczenie 1–5\n/rynek 123 – radar rynku 2 km\n"
                 "/analiza <link> – pełna analiza dowolnej oferty z linku\n"
                 "Odpowiedz na kartę oferty swoją uwagą – agent zapamięta zasadę i oceni ofertę ponownie\n"
-                "/uwaga <tekst> – ogólna zasada · /zasady – lista · /usun 3 – usuń zasadę")
+                "/uwaga <tekst> – ogólna zasada · /zasady – lista · /usun 3 – usuń zasadę\n"
+                "/cena Złotokłos 8500 [galano|bauro|mw] – Twoja cena sprzedaży dla obszaru")
     return None
 
 

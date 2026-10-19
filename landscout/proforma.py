@@ -14,9 +14,31 @@ def market() -> dict:
     return yaml.safe_load((CONFIG_DIR / "market.yml").read_text(encoding="utf-8"))
 
 
+_OV: dict = {"t": 0.0, "v": {}}
+
+
+def price_overrides() -> dict:
+    """Ceny ustawione z Telegrama (/cena Złotokłos 8500) – KV 'price_overrides' = {profil: {obszar: cena}}; cache 60 s."""
+    import json
+    import time
+    if time.time() - _OV["t"] > 60:
+        try:
+            from .db import kv_get, session
+            with session() as db:
+                _OV["v"] = json.loads(kv_get(db, "price_overrides", "{}") or "{}")
+        except Exception:  # noqa: BLE001
+            _OV["v"] = {}
+        _OV["t"] = time.time()
+    return _OV["v"]
+
+
 def sale_price(profile: str, area_name: str | None) -> tuple[float, str]:
-    tbl = market()["sale_price_pln_m2"][profile]
     name = (area_name or "").lower()
+    ov = price_overrides().get(profile) or {}
+    hit = max((k for k in ov if k.lower() in name or name.startswith(k.lower())), key=len, default=None)
+    if hit:
+        return float(ov[hit]), f"{hit} (Twoja cena)"
+    tbl = market()["sale_price_pln_m2"][profile]
     best = None
     for k, v in tbl.items():
         if k == "default":

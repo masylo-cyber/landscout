@@ -29,7 +29,21 @@ OTHER_PCT = 0.06      # sprzedaż, finansowanie, opłaty, wyodrębnienie lokali
 HALA_TEXT = re.compile(r"pod hal|hal[aęiy]\b|magazyn|produkcyj|przemysł|składow|warsztat|baz[aęy] transport|logistyc|"
                        r"aktywności gospodarczej|działalnoś\w* gospodarcz|pod firm|\bP/?U\b|\bU/?P\b|\b\d*PU\b|\b\d*AG\b", re.I)
 WEAK_TEXT = re.compile(r"usługow|pod usługi|komercyjn", re.I)          # tylko w tytule i bez funkcji mieszkaniowej
-HOUSING = re.compile(r"jednorodzin|wielorodzin|mieszkan|rezydenc|pod dom|bl[iı]?[źz]niacz|szeregow", re.I)
+HOUSING = re.compile(r"jednorodzin|wielorodzin|mieszkan|rezydenc|pod dom|bl[iı]?[źz]niacz|szeregow|osiedl", re.I)
+EXPLICIT = re.compile(r"pod hal|magazyn|produkc|przemysł", re.I)
+
+
+def _zone_base(sym: str) -> str:
+    return re.sub(r"^[\d.\s]+", "", sym or "").upper()
+
+
+def _bad_zone(r: Listing) -> bool:
+    """Teren w punkcie działki wyklucza halę: mieszkaniowy (M*), rolny (R, RM), las/zieleń/woda (ZL, ZP, ZN, WS)."""
+    zones = (r.mpzp or {}).get("zones") or []
+    if not zones:
+        return False
+    b = _zone_base(zones[0].get("symbol", ""))
+    return b.startswith("M") or b in ("R", "RM", "RP") or b.startswith(("ZL", "ZP", "ZN", "WS"))
 HALA_PURPOSE = re.compile(r"produkc|przemys|skład|magazyn|aktywno\w* gospodarcz|baz\w* ", re.I)
 HALA_SYM = re.compile(r"^(?:\d+\.?)?(P|U|PU|P/U|U/P|UP|AG|P-U|U-P|PS|UC)(?:[/.-]|$)", re.I)
 NOT_HALA = re.compile(r"usługi publiczne|oświat|sakraln|kultu religijnego|\bUO\b|\bUK\b|zabudowa jednorodzinna(?! z usług)", re.I)
@@ -38,14 +52,18 @@ NOT_HALA = re.compile(r"usługi publiczne|oświat|sakraln|kultu religijnego|\bUO
 def _evidence(r: Listing) -> tuple[int, str]:
     """Siła dowodu: 2 = plan (symbol/przeznaczenie), 1 = ogłoszenie / analiza, 0 = brak."""
     mp = r.mpzp or {}
-    for z in (mp.get("zones") or [])[:1]:          # teren w punkcie działki
+    zones = mp.get("zones") or []
+    on_road = bool(zones) and _zone_base(zones[0].get("symbol", "")).startswith("KD")   # pinezka na drodze
+    if zones and not on_road:                       # teren w punkcie działki
+        z = zones[0]
         pur = z.get("purpose", "")
         usl_only = re.search(r"usług", pur, re.I) and not HOUSING.search(pur)
         if (HALA_SYM.match(z.get("symbol", "").replace(" ", "")) or HALA_PURPOSE.search(pur) or usl_only) and not NOT_HALA.search(pur):
             return 2, f"plan: {z.get('symbol')} – {pur}"
-    for sym in mp.get("symbols") or []:
-        if HALA_SYM.match(sym):
-            return 2, f"plan: {sym}"
+    if not on_road:
+        for sym in mp.get("symbols") or []:
+            if HALA_SYM.match(sym):
+                return 2, f"plan: {sym}"
     a = r.analysis or {}
     zs = a.get("zoning_symbol") or ""
     if zs and HALA_SYM.match(zs.replace(" ", "")):
@@ -80,7 +98,7 @@ def score_hala(r: Listing) -> tuple[float | None, str, float | None]:
     km = _dist_km(MAGDALENKA[0], MAGDALENKA[1], r.lat, r.lon)
     if km > MAX_KM:
         return None, "", None
-    if HOUSING.search(r.title or "") and not re.search(r"pod hal|magazyn|produkc", r.title or "", re.I):
+    if (HOUSING.search(r.title or "") or _bad_zone(r)) and not EXPLICIT.search(r.title or ""):
         return None, "", km
     ev, why = _evidence(r)
     if ev == 0:

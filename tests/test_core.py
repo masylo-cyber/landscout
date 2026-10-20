@@ -135,3 +135,15 @@ def test_hala_proforma_and_housing_title():
     twin = Listing(external_id="h6", title="atrakcyjna działka pod zabudowę blźniaczą", area_m2=3000, price_pln=3_300_000,
                    lat=52.08, lon=20.99, mpzp={"zones": [{"symbol": "U", "purpose": "usługi"}]}, **base)
     assert score_hala(twin)[0] is None
+
+
+def test_hala_rejects_bad_zones():
+    from landscout.hala import score_hala
+    base = dict(source="t", url="u", description="działka usługowa", kind="dzialka", parcel={}, images=[], raw={}, price_history=[],
+                analysis={}, area_m2=3000, price_pln=1_000_000, lat=52.08, lon=20.99)
+    assert score_hala(Listing(external_id="z1", title="Działka usługowa", mpzp={"zones": [{"symbol": "MU2", "purpose": "usługi"}]}, **base))[0] is None
+    assert score_hala(Listing(external_id="z2", title="Działka usługowa", mpzp={"zones": [{"symbol": "2ZL", "purpose": "las"}]}, **base))[0] is None
+    assert score_hala(Listing(external_id="z3", title="Działka pod mini osiedle", mpzp={}, **base))[0] is None
+    road = Listing(external_id="z4", title="Działka usługowa", mpzp={"zones": [{"symbol": "6KDZ", "purpose": "droga"}], "symbols": ["KDZ"]}, **base)
+    sc, why, _ = score_hala(road)
+    assert sc is not None and why.startswith("ogłoszenie")

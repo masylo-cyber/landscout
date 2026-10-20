@@ -55,8 +55,12 @@ def krakowska_km(lat: float, lon: float) -> float:
 
 def sale_pm2(km_magdalenka: float) -> int:
     return SALE_PM2_NEAR if km_magdalenka <= 10 else SALE_PM2_FAR
-HALA_TEXT = re.compile(r"pod hal|hal[aęiy]\b|magazyn|produkcyj|przemysł|składow|warsztat|baz[aęy] transport|logistyc|"
-                       r"aktywności gospodarczej|działalnoś\w* gospodarcz|pod firm|\bP/?U\b|\bU/?P\b|\b\d*PU\b|\b\d*AG\b", re.I)
+HALA_TEXT = re.compile(r"pod hal|hal[aęiy]\b|magazyn|produkcyj|przemysł|składow|baz[aęy] transport|logistyc|"
+                       r"aktywności gospodarczej|działalnoś\w* gospodarcz|inwestycyjn|\bP/?U\b|\bU/?P\b|\b\d*PU\b|\b\d*AG\b", re.I)
+# cena gruntu: poniżej 100 zł/m² to rolna/las albo błędna lokalizacja, powyżej 2500 zł/m² hala się nie spina
+PM2_MIN, PM2_MAX = 100, 2500
+# Warszawa: tylko dzielnice przy Al. Krakowskiej / na południu; reszta miasta nie pasuje do modelu
+WAW_OK = re.compile(r"włochy|ursus|ursynów|wilanów|wawer", re.I)
 WEAK_TEXT = re.compile(r"usługow|pod usługi|komercyjn", re.I)          # tylko w tytule i bez funkcji mieszkaniowej
 HOUSING = re.compile(r"jednorodzin|wielorodzin|mieszkan|rezydenc|pod dom|bl[iı]?[źz]niacz|szeregow|osiedl", re.I)
 EXPLICIT = re.compile(r"pod hal|magazyn|produkc|przemysł", re.I)
@@ -97,8 +101,9 @@ def _evidence(r: Listing) -> tuple[int, str]:
     zs = a.get("zoning_symbol") or ""
     if zs and HALA_SYM.match(zs.replace(" ", "")):
         return 1, f"ogłoszenie/analiza: {zs}"
-    txt = f"{r.title} {r.description or ''}"
-    m = HALA_TEXT.search(txt)
+    # tytuł: dowolne słowo z HALA_TEXT; opis: tylko wyraźne (pod halę / magazyn / produkcja / przemysł / symbol planu)
+    m = HALA_TEXT.search(r.title or "") or re.search(r"pod hal|magazyn|produkc|przemysł|\bP/?U\b|\bU/?P\b|\b\d*PU\b|\b\d*AG\b",
+                                                    r.description or "", re.I)
     if m and not NOT_HALA.search(r.title) and not HOUSING.search(r.title):
         return 1, f"ogłoszenie: „{m.group(0)}”"
     w = WEAK_TEXT.search(r.title)
@@ -120,10 +125,20 @@ def proforma(r: Listing) -> dict:
             "margin_pct": round(100 * margin / rev, 1) if rev else None, "land_known": bool(land)}
 
 
+def _in_warsaw_wrong_district(r: Listing) -> bool:
+    p = r.parcel or {}
+    where = f"{p.get('commune', '')} {p.get('region', '')} {r.location_text or ''} {r.area_name or ''}"
+    return bool(re.search(r"warszawa", where, re.I)) and not WAW_OK.search(where)
+
+
 def score_hala(r: Listing) -> tuple[float | None, str, float | None]:
     if not (r.lat and r.lon) or r.kind not in ("dzialka", "unknown", "inne", "dom_rozbiorka"):
         return None, "", None
     if not r.area_m2 or not (AREA_MIN <= r.area_m2 <= AREA_MAX):
+        return None, "", None
+    if r.price_pln and r.area_m2 and not (PM2_MIN <= r.price_pln / r.area_m2 <= PM2_MAX):
+        return None, "", None
+    if _in_warsaw_wrong_district(r):
         return None, "", None
     km = _dist_km(MAGDALENKA[0], MAGDALENKA[1], r.lat, r.lon)
     if km > MAX_KM_CORRIDOR or (km > MAX_KM and krakowska_km(r.lat, r.lon) > CORRIDOR_MAX_KM):

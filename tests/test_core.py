@@ -166,3 +166,17 @@ def test_hala_krakowska_corridor():
                      lat=51.87, lon=20.87, kind="dzialka", mpzp={"zones": [{"symbol": "P", "purpose": "produkcja"}]},
                      analysis={}, parcel={}, images=[], raw={}, price_history=[])
     assert score_hala(grojec)[0] is not None           # Grójec: >25 km, ale w korytarzu
+
+
+def test_hala_rejects_mislocated_and_weak():
+    from landscout.hala import score_hala
+    base = dict(source="t", url="u", kind="dzialka", parcel={}, images=[], raw={}, price_history=[], analysis={}, mpzp={})
+    zol = Listing(external_id="w1", title="Działka na sprzedaż, 6140 m² Żoliborz, Adama Mickiewicza", description="warsztat, media",
+                  area_m2=6140, price_pln=367_000, lat=52.272, lon=20.983, location_text="Adama Mickiewicza, Żoliborz", **base)
+    assert score_hala(zol)[0] is None                    # 60 zł/m² + Żoliborz + słaby dowód
+    weak = Listing(external_id="w2", title="Działka 3000 m2 Łazy", description="obok jest warsztat samochodowy",
+                   area_m2=3000, price_pln=1_500_000, lat=52.10, lon=20.99, location_text="Łazy", **base)
+    assert score_hala(weak)[0] is None                   # „warsztat” w opisie nie wystarcza
+    ok = Listing(external_id="w3", title="Działka 3000 m2 Łazy", description="MPZP PU, idealna pod halę magazynową",
+                 area_m2=3000, price_pln=1_500_000, lat=52.10, lon=20.99, location_text="Łazy", **base)
+    assert score_hala(ok)[0] is not None

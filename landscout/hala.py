@@ -11,7 +11,10 @@ import re
 from datetime import datetime, timedelta, timezone
 from html import escape
 
-from sqlalchemy import select, update
+import time
+
+from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 
 from .comps import _dist_km
 from .config import settings
@@ -178,15 +181,30 @@ def card(r: Listing, why: str, km: float) -> str:
 
 
 def run_hala(send: bool = True, force: bool = False) -> dict:
+    """Z ponawianiem przy deadlocku (równoległy `landscout run` aktualizuje te same wiersze)."""
+    for attempt in range(3):
+        try:
+            return _run_hala(send, force)
+        except OperationalError as e:
+            if "deadlock" not in str(e).lower() or attempt == 2:
+                raise
+            log.warning("hala: deadlock, ponawiam za 3 s")
+            time.sleep(3)
+    return {}
+
+
+def _run_hala(send: bool, force: bool) -> dict:
     from .notify import send_telegram, telegram_chat_id
     st = {"hala_matches": 0, "hala_sent": 0}
     with session() as db:
-        db.execute(update(Listing).where(Listing.score_hala.isnot(None)).values(score_hala=None))
         rows = []
-        for r in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.lat.isnot(None),
-                                                  Listing.area_m2.between(AREA_MIN, AREA_MAX))):
-            sc, why, km = score_hala(r)
-            r.score_hala = sc
+        # wiersz po wierszu, w kolejności id – bez zbiorczego UPDATE blokującego całą tabelę
+        for r in db.scalars(select(Listing).where(Listing.lat.isnot(None)).where(
+                (Listing.score_hala.isnot(None)) | (Listing.active.is_(True) & Listing.area_m2.between(AREA_MIN, AREA_MAX)))
+                .order_by(Listing.id)):
+            sc, why, km = score_hala(r) if r.active else (None, "", None)
+            if r.score_hala != sc:
+                r.score_hala = sc
             if sc is not None and sc >= 40:
                 rows.append((r, why, km))
         db.commit()

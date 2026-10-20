@@ -47,6 +47,8 @@ def run(only_source: str | None = None, no_llm: bool = False, no_alerts: bool = 
                         n_src += 1
                         stats["collected"] += 1
                         stats["new"] += int(is_new)
+                        if n_src % 25 == 0:
+                            db.commit()        # krótkie transakcje: mniej blokad na listings przy równoległym `landscout hala`
                     db.commit()
                 except Exception as e:  # noqa: BLE001
                     db.rollback()

@@ -265,7 +265,7 @@ def handle(text: str, chat: str, reply_to: str = "") -> str | None:
             for r in rows:
                 _, why, km = score_hala(r)
                 out.append(hcard(r, why, km or 0))
-            return "\n\n".join(out) if out else "Brak gruntów pod halę w promieniu 25 km od Magdalenki."
+            return "\n\n".join(out) if out else "Brak gruntów pod halę w promieniu 40 km od Magdalenki (korytarz Al. Krakowskiej po Grójec)."
     if cmd in ("/wynajem",):
         from .db import Rental
         with session() as db:
@@ -295,7 +295,7 @@ def _first_hala() -> None:
         st = run_hala(send=True, force=True)
         if not st.get("hala_sent"):
             from .notify import send_telegram
-            send_telegram("Na razie brak nowych gruntów pod halę w promieniu 25 km od Magdalenki – dam znać, gdy się pojawią.", "hala")
+            send_telegram("Na razie brak nowych gruntów pod halę w promieniu 40 km od Magdalenki (korytarz Al. Krakowskiej po Grójec) – dam znać, gdy się pojawią.", "hala")
     except Exception as e:  # noqa: BLE001
         log.warning("hala start: %s", e)
 

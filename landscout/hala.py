@@ -1,7 +1,9 @@
-"""Grunt pod halę z lokalami magazynowo-usługowymi na sprzedaż (model HLD Macierzysz: moduły 240 m², KW + udział w gruncie).
-Działki 1200–12000 m² (najlepiej 1500–3000) z możliwością postawienia hali (P, U, P/U, AG, usługi/produkcja/magazyn w planie
-lub ogłoszeniu), im bliżej Magdalenki tym wyżej. Karta liczy moduły i wstępną marżę. Czat Telegram „hala”, paczka co
-ALERT_INTERVAL_DAYS."""
+"""Grunt pod lekką halę z lokalami magazynowo-usługowymi na sprzedaż (model HLD Macierzysz: moduły 240 m², KW + udział w gruncie).
+Lekkie magazynowanie – bez wymogu dojazdu TIR. Działki 1200–12000 m² (najlepiej 1500–3000) z możliwością postawienia hali
+(P, U, P/U, PU, AG, usługi/produkcja/magazyn w planie lub ogłoszeniu). Priorytet: korytarz Al. Krakowskiej (DK7)
+Raszyn – Janki – Sękocin – Mroków – Wola Mrokowska – Tarczyn – Grójec (np. Grzędy PU) oraz bliskość Magdalenki.
+Karta liczy moduły i wstępną marżę (cena sprzedaży lokali zależy od odległości od Warszawy). Czat Telegram „hala”,
+paczka co ALERT_INTERVAL_DAYS."""
 from __future__ import annotations
 
 import logging
@@ -18,14 +20,41 @@ from .db import Listing, kv_get, kv_set, session
 log = logging.getLogger("landscout.hala")
 
 MAGDALENKA = (52.0597, 20.9572)
-MAX_KM = 25
+MAX_KM = 25           # od Magdalenki w dowolnym kierunku
+MAX_KM_CORRIDOR = 40  # dalej (Tarczyn ~12 km, Grójec ~23 km) tylko wzdłuż Al. Krakowskiej
+# Al. Krakowska / DK7 od Raszyna do Grójca (przybliżona linia łamana lat, lon)
+KRAKOWSKA = [(52.154, 20.925), (52.134, 20.898), (52.114, 20.885), (52.071, 20.864), (52.020, 20.852),
+             (51.978, 20.845), (51.930, 20.850), (51.862, 20.868)]
+CORRIDOR_KM = 2.5     # tyle od Krakowskiej = „przy trasie”
+CORRIDOR_MAX_KM = 6   # poza tym pasem dalekie oferty (>MAX_KM) odpadają
 AREA_MIN, AREA_MAX, AREA_BEST = 1200, 12000, (1500, 3000)
 # model lokali jak HLD Macierzysz (2 hale × 9 lokali po 240 m², 2,15 mln netto/lokal ≈ 8 960 zł/m²)
 MODULE_M2 = 240
 GLA_RATIO = 0.40      # powierzchnia lokali / powierzchnia działki (parking, manewr, 20–30% bio)
-SALE_PM2 = 8000       # zł netto/m² lokalu – ostrożniej niż HLD (Macierzysz przy S8/S2/A2)
-BUILD_PM2 = 4500      # zł netto/m² lokalu: hala stalowa 7 m, biuro, bramy, drogi, parking, media, projekt
+SALE_PM2_NEAR = 8000  # zł netto/m² lokalu do ~10 km od Magdalenki (Łazy, Sękocin, Mroków, Raszyn, Nadarzyn)
+SALE_PM2_FAR = 6500   # zł netto/m² lokalu dalej (Grzędy, Tarczyn, Grójec, Prażmów)
+BUILD_PM2 = 4000      # zł netto/m² lokalu: lekka hala stalowa, biuro, bramy, drogi, parking, media, projekt
 OTHER_PCT = 0.06      # sprzedaż, finansowanie, opłaty, wyodrębnienie lokali
+
+
+def _seg_km(p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Odległość punktu od odcinka a-b (lokalne przybliżenie płaskie w km)."""
+    import math
+    kx = 111.32 * math.cos(math.radians(p[0]))
+    ax, ay = (a[1] - p[1]) * kx, (a[0] - p[0]) * 111.32
+    bx, by = (b[1] - p[1]) * kx, (b[0] - p[0]) * 111.32
+    dx, dy = bx - ax, by - ay
+    t = 0.0 if dx == dy == 0 else max(0.0, min(1.0, -(ax * dx + ay * dy) / (dx * dx + dy * dy)))
+    return math.hypot(ax + t * dx, ay + t * dy)
+
+
+def krakowska_km(lat: float, lon: float) -> float:
+    """Odległość od Al. Krakowskiej (DK7) między Raszynem a Grójcem."""
+    return min(_seg_km((lat, lon), KRAKOWSKA[i], KRAKOWSKA[i + 1]) for i in range(len(KRAKOWSKA) - 1))
+
+
+def sale_pm2(km_magdalenka: float) -> int:
+    return SALE_PM2_NEAR if km_magdalenka <= 10 else SALE_PM2_FAR
 HALA_TEXT = re.compile(r"pod hal|hal[aęiy]\b|magazyn|produkcyj|przemysł|składow|warsztat|baz[aęy] transport|logistyc|"
                        r"aktywności gospodarczej|działalnoś\w* gospodarcz|pod firm|\bP/?U\b|\bU/?P\b|\b\d*PU\b|\b\d*AG\b", re.I)
 WEAK_TEXT = re.compile(r"usługow|pod usługi|komercyjn", re.I)          # tylko w tytule i bez funkcji mieszkaniowej
@@ -82,7 +111,8 @@ def proforma(r: Listing) -> dict:
     """Ile modułów 240 m² zmieści działka i jaka wstępna marża przy sprzedaży lokali."""
     mods = int((r.area_m2 or 0) * GLA_RATIO // MODULE_M2)
     gla = mods * MODULE_M2
-    rev = gla * SALE_PM2
+    km = _dist_km(MAGDALENKA[0], MAGDALENKA[1], r.lat, r.lon) if r.lat and r.lon else 0.0
+    rev = gla * sale_pm2(km)
     land = r.price_pln or 0
     cost = gla * BUILD_PM2 + land + rev * OTHER_PCT
     margin = rev - cost
@@ -96,14 +126,20 @@ def score_hala(r: Listing) -> tuple[float | None, str, float | None]:
     if not r.area_m2 or not (AREA_MIN <= r.area_m2 <= AREA_MAX):
         return None, "", None
     km = _dist_km(MAGDALENKA[0], MAGDALENKA[1], r.lat, r.lon)
-    if km > MAX_KM:
+    if km > MAX_KM_CORRIDOR or (km > MAX_KM and krakowska_km(r.lat, r.lon) > CORRIDOR_MAX_KM):
         return None, "", None
     if (HOUSING.search(r.title or "") or _bad_zone(r)) and not EXPLICIT.search(r.title or ""):
         return None, "", km
     ev, why = _evidence(r)
     if ev == 0:
         return None, "", km
-    sc = 100 - km * 3 + (15 if ev == 2 else 0)
+    kk = krakowska_km(r.lat, r.lon)
+    sc = 100 - km * 1.5 + (15 if ev == 2 else 0)
+    if kk <= CORRIDOR_KM:
+        sc += 15
+        why = f"{why} · Al. Krakowska {kk:.1f} km"
+    elif kk <= 6:
+        sc += 5
     if AREA_BEST[0] <= r.area_m2 <= AREA_BEST[1]:
         sc += 10
     if re.search(r"pod hal|hala|magazyn", f"{r.title} {r.description or ''}", re.I):
@@ -121,7 +157,7 @@ def _pf_line(r: Listing) -> str:
     pf = proforma(r)
     if not pf["modules"]:
         return ""
-    line = f"≈{pf['modules']} lokali × {MODULE_M2} m² · sprzedaż {pf['revenue'] / 1e6:.1f} mln netto"
+    line = f"≈{pf['modules']} lokali × {MODULE_M2} m² · sprzedaż {pf['revenue'] / 1e6:.1f} mln netto ({pf['revenue'] // max(pf['gla'], 1):,.0f} zł/m²)".replace(",", " ")
     if pf["land_known"]:
         line += f" · marża {pf['margin'] / 1e6:.1f} mln ({pf['margin_pct']:.0f}%)"
     return line
@@ -171,7 +207,7 @@ def run_hala(send: bool = True, force: bool = False) -> dict:
             seen.add(key)
             out.append(card(r, why, km))
             r.alerted_hala = True
-        chunk = f"<b>🏭 Grunty pod halę – {len(out)} nowych (najbliżej Magdalenki na górze)</b>"
+        chunk = f"<b>🏭 Grunty pod lekką halę – {len(out)} nowych (korytarz Al. Krakowskiej i okolice Magdalenki na górze)</b>"
         for c in out:
             if len(chunk) + len(c) > 3800:
                 send_telegram(chunk, "hala")

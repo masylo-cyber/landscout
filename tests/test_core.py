@@ -112,7 +112,7 @@ def test_hala_scoring():
                     lat=52.07, lon=20.97, mpzp={"zones": [{"symbol": "MN", "purpose": "zabudowa jednorodzinna"}]}, **base)
     sn, why, km = score_hala(near)
     assert sn and sn > 80 and "plan" in why and km < 5
-    assert score_hala(far)[0] is None          # > 25 km
+    assert score_hala(far)[0] is None          # > 25 km i poza korytarzem Al. Krakowskiej
     assert score_hala(house)[0] is None
 
 
@@ -147,3 +147,22 @@ def test_hala_rejects_bad_zones():
     road = Listing(external_id="z4", title="Działka usługowa", mpzp={"zones": [{"symbol": "6KDZ", "purpose": "droga"}], "symbols": ["KDZ"]}, **base)
     sc, why, _ = score_hala(road)
     assert sc is not None and why.startswith("ogłoszenie")
+
+
+def test_hala_krakowska_corridor():
+    from landscout.hala import krakowska_km, proforma, score_hala
+    assert krakowska_km(51.990, 20.850) < 1.5          # Grzędy przy Al. Krakowskiej
+    assert krakowska_km(52.06, 21.12) > 10             # Konstancin – daleko od korytarza
+    row = Listing(source="t", external_id="h1", url="u", title="Działka inwestycyjna PU przy Al. Krakowskiej, Grzędy",
+                  description="MPZP PU, media, pod halę magazynową", area_m2=2500, price_pln=900_000,
+                  lat=51.990, lon=20.850, kind="dzialka",
+                  mpzp={"has_plan": True, "symbols": ["PU"], "zones": [{"symbol": "3PU", "purpose": "tereny produkcyjno-usługowe", "plan": "x"}]},
+                  analysis={}, parcel={}, images=[], raw={}, price_history=[])
+    sc, why, km = score_hala(row)
+    assert sc is not None and sc >= 70 and "Al. Krakowska" in why
+    pf = proforma(row)
+    assert pf["modules"] == 4 and pf["revenue"] == 4 * 240 * 6500   # >10 km od Magdalenki -> cena „dalej”
+    grojec = Listing(source="t", external_id="h2", url="u", title="Działka pod halę", description="", area_m2=2000, price_pln=500_000,
+                     lat=51.87, lon=20.87, kind="dzialka", mpzp={"zones": [{"symbol": "P", "purpose": "produkcja"}]},
+                     analysis={}, parcel={}, images=[], raw={}, price_history=[])
+    assert score_hala(grojec)[0] is not None           # Grójec: >25 km, ale w korytarzu

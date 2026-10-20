@@ -28,6 +28,7 @@ LOCATIONS = [
 SEARCHES = [
     # (typ, dodatkowe parametry)
     ("dzialka", "areaMin=600"),
+    ("dzialka", "plotType=%5BCOMMERCIAL%5D&areaMin=1200"),   # działki inwestycyjne/usługowe – pod halę
     ("dom", "description=rozbi%C3%B3rki"),      # domy "do rozbiórki"
     ("dom", "description=wyburzenia"),
 ]

@@ -122,3 +122,16 @@ def test_hala_rejects_housing_with_services():
                 area_m2=2000, price_pln=2_000_000, lat=52.10, lon=21.06, parcel={}, images=[], raw={}, price_history=[], analysis={},
                 mpzp={"zones": [{"symbol": "3MNU", "purpose": "zabudowa jednorodzinna z usługami"}]})
     assert score_hala(r)[0] is None
+
+
+def test_hala_proforma_and_housing_title():
+    from landscout.hala import proforma, score_hala
+    base = dict(source="t", url="u", description="", kind="dzialka", parcel={}, images=[], raw={}, price_history=[], analysis={})
+    r = Listing(external_id="h5", title="Działka usługowa 2500 m2", area_m2=2500, price_pln=1_500_000, lat=52.08, lon=20.99,
+                mpzp={"zones": [{"symbol": "U", "purpose": "usługi"}]}, **base)
+    pf = proforma(r)
+    assert pf["modules"] == 4 and pf["revenue"] == 4 * 240 * 8000
+    assert 10 < pf["margin_pct"] < 40
+    twin = Listing(external_id="h6", title="atrakcyjna działka pod zabudowę blźniaczą", area_m2=3000, price_pln=3_300_000,
+                   lat=52.08, lon=20.99, mpzp={"zones": [{"symbol": "U", "purpose": "usługi"}]}, **base)
+    assert score_hala(twin)[0] is None

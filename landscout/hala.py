@@ -1,5 +1,7 @@
-"""Grunt pod halę: działki ~800–3500 m² (najlepiej do 2500) z możliwością postawienia hali (P, U, P/U, AG, usługi/produkcja/
-magazyn w planie lub ogłoszeniu), im bliżej Magdalenki tym wyżej. Osobny czat Telegram „hala”, paczka co ALERT_INTERVAL_DAYS."""
+"""Grunt pod halę z lokalami magazynowo-usługowymi na sprzedaż (model HLD Macierzysz: moduły 240 m², KW + udział w gruncie).
+Działki 1200–12000 m² (najlepiej 1500–3000) z możliwością postawienia hali (P, U, P/U, AG, usługi/produkcja/magazyn w planie
+lub ogłoszeniu), im bliżej Magdalenki tym wyżej. Karta liczy moduły i wstępną marżę. Czat Telegram „hala”, paczka co
+ALERT_INTERVAL_DAYS."""
 from __future__ import annotations
 
 import logging
@@ -7,7 +9,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from html import escape
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from .comps import _dist_km
 from .config import settings
@@ -17,11 +19,17 @@ log = logging.getLogger("landscout.hala")
 
 MAGDALENKA = (52.0597, 20.9572)
 MAX_KM = 25
-AREA_MIN, AREA_MAX, AREA_BEST = 800, 3500, (1500, 2800)
+AREA_MIN, AREA_MAX, AREA_BEST = 1200, 12000, (1500, 3000)
+# model lokali jak HLD Macierzysz (2 hale × 9 lokali po 240 m², 2,15 mln netto/lokal ≈ 8 960 zł/m²)
+MODULE_M2 = 240
+GLA_RATIO = 0.40      # powierzchnia lokali / powierzchnia działki (parking, manewr, 20–30% bio)
+SALE_PM2 = 8000       # zł netto/m² lokalu – ostrożniej niż HLD (Macierzysz przy S8/S2/A2)
+BUILD_PM2 = 4500      # zł netto/m² lokalu: hala stalowa 7 m, biuro, bramy, drogi, parking, media, projekt
+OTHER_PCT = 0.06      # sprzedaż, finansowanie, opłaty, wyodrębnienie lokali
 HALA_TEXT = re.compile(r"pod hal|hal[aęiy]\b|magazyn|produkcyj|przemysł|składow|warsztat|baz[aęy] transport|logistyc|"
                        r"aktywności gospodarczej|działalnoś\w* gospodarcz|pod firm|\bP/?U\b|\bU/?P\b|\b\d*PU\b|\b\d*AG\b", re.I)
 WEAK_TEXT = re.compile(r"usługow|pod usługi|komercyjn", re.I)          # tylko w tytule i bez funkcji mieszkaniowej
-HOUSING = re.compile(r"jednorodzin|wielorodzin|mieszkan|rezydenc|pod dom|bliźniacz|blzniacz", re.I)
+HOUSING = re.compile(r"jednorodzin|wielorodzin|mieszkan|rezydenc|pod dom|bl[iı]?[źz]niacz|szeregow", re.I)
 HALA_PURPOSE = re.compile(r"produkc|przemys|skład|magazyn|aktywno\w* gospodarcz|baz\w* ", re.I)
 HALA_SYM = re.compile(r"^(?:\d+\.?)?(P|U|PU|P/U|U/P|UP|AG|P-U|U-P|PS|UC)(?:[/.-]|$)", re.I)
 NOT_HALA = re.compile(r"usługi publiczne|oświat|sakraln|kultu religijnego|\bUO\b|\bUK\b|zabudowa jednorodzinna(?! z usług)", re.I)
@@ -52,6 +60,18 @@ def _evidence(r: Listing) -> tuple[int, str]:
     return 0, ""
 
 
+def proforma(r: Listing) -> dict:
+    """Ile modułów 240 m² zmieści działka i jaka wstępna marża przy sprzedaży lokali."""
+    mods = int((r.area_m2 or 0) * GLA_RATIO // MODULE_M2)
+    gla = mods * MODULE_M2
+    rev = gla * SALE_PM2
+    land = r.price_pln or 0
+    cost = gla * BUILD_PM2 + land + rev * OTHER_PCT
+    margin = rev - cost
+    return {"modules": mods, "gla": gla, "revenue": rev, "cost": cost, "margin": margin,
+            "margin_pct": round(100 * margin / rev, 1) if rev else None, "land_known": bool(land)}
+
+
 def score_hala(r: Listing) -> tuple[float | None, str, float | None]:
     if not (r.lat and r.lon) or r.kind not in ("dzialka", "unknown", "inne", "dom_rozbiorka"):
         return None, "", None
@@ -60,6 +80,8 @@ def score_hala(r: Listing) -> tuple[float | None, str, float | None]:
     km = _dist_km(MAGDALENKA[0], MAGDALENKA[1], r.lat, r.lon)
     if km > MAX_KM:
         return None, "", None
+    if HOUSING.search(r.title or "") and not re.search(r"pod hal|magazyn|produkc", r.title or "", re.I):
+        return None, "", km
     ev, why = _evidence(r)
     if ev == 0:
         return None, "", km
@@ -70,7 +92,21 @@ def score_hala(r: Listing) -> tuple[float | None, str, float | None]:
         sc += 10
     if not r.price_pln or r.price_pln < 10000:
         sc -= 15
+    else:
+        mp = proforma(r).get("margin_pct")
+        if mp is not None:
+            sc += 10 if mp >= 25 else (0 if mp >= 15 else -15)
     return round(max(0.0, min(100.0, sc)), 1), why, km
+
+
+def _pf_line(r: Listing) -> str:
+    pf = proforma(r)
+    if not pf["modules"]:
+        return ""
+    line = f"≈{pf['modules']} lokali × {MODULE_M2} m² · sprzedaż {pf['revenue'] / 1e6:.1f} mln netto"
+    if pf["land_known"]:
+        line += f" · marża {pf['margin'] / 1e6:.1f} mln ({pf['margin_pct']:.0f}%)"
+    return line
 
 
 def card(r: Listing, why: str, km: float) -> str:
@@ -80,6 +116,7 @@ def card(r: Listing, why: str, km: float) -> str:
         f"<b>🏭 HALA {r.score_hala:.0f}</b> · {escape((r.location_text or r.area_name or '?')[:60])} · <b>{km:.1f} km</b> od Magdalenki",
         f"<b>{price}</b>{pm2} · {r.area_m2:,.0f} m²".replace(",", " "),
         escape(why[:140]),
+        _pf_line(r),
         escape(r.title[:110]),
         f'<a href="{escape(r.url)}">▶ oferta ({r.source})</a>'
         + (f' · <a href="https://maps.google.com/?q={r.lat},{r.lon}">mapa</a>' if r.lat and r.lon else "") + f" · #{r.id}",
@@ -90,6 +127,7 @@ def run_hala(send: bool = True, force: bool = False) -> dict:
     from .notify import send_telegram, telegram_chat_id
     st = {"hala_matches": 0, "hala_sent": 0}
     with session() as db:
+        db.execute(update(Listing).where(Listing.score_hala.isnot(None)).values(score_hala=None))
         rows = []
         for r in db.scalars(select(Listing).where(Listing.active.is_(True), Listing.lat.isnot(None),
                                                   Listing.area_m2.between(AREA_MIN, AREA_MAX))):

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 from html import escape
 
 import httpx
@@ -283,8 +284,20 @@ def handle(text: str, chat: str, reply_to: str = "") -> str | None:
                 "Odpowiedz na kartę oferty swoją uwagą – agent zapamięta zasadę i oceni ofertę ponownie\n"
                 "/uwaga <tekst> – ogólna zasada · /zasady – lista · /usun 3 – usuń zasadę\n"
                 "/cena Złotokłos 8500 [galano|bauro|mw] – Twoja cena sprzedaży dla obszaru\n"
-                "/wynajem – domy na wynajem · /hala – grunty pod halę")
+                "/wynajem – domy na wynajem · /hala – grunty pod halę\n/bot hala (lub /start hala) – podepnij ten czat pod grupę")
     return None
+
+
+def _first_hala() -> None:
+    """Po podpięciu grupy „hala” od razu wysyła aktualną listę (bez czekania na paczkę co 4 dni)."""
+    try:
+        from .hala import run_hala
+        st = run_hala(send=True, force=True)
+        if not st.get("hala_sent"):
+            from .notify import send_telegram
+            send_telegram("Na razie brak nowych gruntów pod halę w promieniu 25 km od Magdalenki – dam znać, gdy się pojawią.", "hala")
+    except Exception as e:  # noqa: BLE001
+        log.warning("hala start: %s", e)
 
 
 def poll_once() -> int:
@@ -310,14 +323,17 @@ def poll_once() -> int:
         txt = m.get("text") or ""
         if not chat or not txt:
             continue
-        if txt.lower().startswith("/start"):
+        if txt.lower().startswith(("/start", "/bot")):
             low = txt.lower()
             names = [p for p in ("galano", "bauro", "wynajem", "hala") if p in low]
             if names:
                 with session() as db:
                     for p in names:
                         kv_set(db, f"tg_chat_{p}", chat)
-                _send(chat, "✅ Ten czat odbiera: " + ", ".join(names))
+                _send(chat, "✅ Ten czat odbiera: " + ", ".join(names)
+                      + ("\nSzukam gruntów pod halę – pierwsza lista za chwilę." if "hala" in names else ""))
+                if "hala" in names:
+                    threading.Thread(target=_first_hala, daemon=True).start()
             continue
         rt = (m.get("reply_to_message") or {})
         reply = handle(txt, chat, (rt.get("text") or rt.get("caption") or ""))
